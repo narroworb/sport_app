@@ -1,0 +1,7 @@
+*.tar.gz
+*.tar
+*.gz
+*.sql
+*.gitignore
+backup/
+clickhouse-data/

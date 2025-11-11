@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync/atomic"
 
@@ -30,12 +31,17 @@ type ClichouseDB struct {
 }
 
 func NewClickhouseDB() (*ClichouseDB, error) {
+	dbAddr := os.Getenv("DATABASE_ADDR")
+	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASS")
+
 	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{"127.0.0.1:9000"},
+		Addr: []string{dbAddr},
 		Auth: clickhouse.Auth{
-			Database: "sports_data",
-			Username: "default",
-			Password: "",
+			Database: dbName,
+			Username: dbUser,
+			Password: dbPass,
 		},
 		Settings: map[string]interface{}{
 			"max_execution_time": 60,

@@ -12,8 +12,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("error in create db: %v", err)
 	}
+	log.Println("Connected to db")
 	defer db.Close()
 	updater := collector.NewUpdater(db)
+	log.Println("Connected to updater")
 
+	log.Println("Start update")
 	updater.StartUpdate()
+	log.Println("Update done")
 }

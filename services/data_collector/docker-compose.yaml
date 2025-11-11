@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3.6
+    container_name: sports_data_clickhouse_prod
+    restart: always
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - ./internal/database/clickhouse-data:/var/lib/clickhouse/data
+      - ./internal/database/logs:/var/log/clickhouse-server
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+    cap_add:
+      - SYS_NICE
+      - NET_ADMIN
+      - IPC_LOCK
+      - SYS_PTRACE
+
+  data_collector_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: data_collector_service
+    depends_on:
+      - clickhouse
+    env_file:
+      - .env
+    restart: always

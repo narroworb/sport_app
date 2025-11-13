@@ -4,4 +4,6 @@
 *.sql
 *.gitignore
 backup/
-clickhouse-data/
+internal/database/clickhouse-data/
+internal/database/logs/
+fix_bug/

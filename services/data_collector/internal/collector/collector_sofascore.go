@@ -232,6 +232,7 @@ func (u *Updater) StartUpdate() {
 	}
 	wg.Wait()
 	close(tasks)
+	log.Println("update done succesfully")
 }
 
 func fetchBodyConc(ctx context.Context, url string) (string, error) {
@@ -473,7 +474,7 @@ func (u *Updater) fetchAllStatisticsFromMatches(ctx context.Context, matchID str
 		return StatsFromMatch{}, err
 	}
 
-	res.teamStats.RedCardsHome, res.teamStats.RedCardsAway = u.PSResponseToPSStructs(ctx, playerStatsMatchResp, &res)
+	res.teamStats.RedCardsHome, res.teamStats.RedCardsAway = u.pSResponseToPSStructs(ctx, playerStatsMatchResp, &res)
 
 	incidentsBody, err := fetchBodyConc(ctx, urlIncidents)
 	if err != nil {
@@ -491,7 +492,7 @@ func (u *Updater) fetchAllStatisticsFromMatches(ctx context.Context, matchID str
 		return StatsFromMatch{}, err
 	}
 
-	u.IResponseToPS(ctx, incidentsResp, &res, urlIncidents)
+	u.iResponseToPS(ctx, incidentsResp, &res, urlIncidents)
 
 	return res, err
 }
@@ -689,7 +690,7 @@ func TSResponseToTSStruct(resp TeamStatsResponse) models.TeamMatchStats {
 	return res
 }
 
-func (u *Updater) PSResponseToPSStructs(ctx context.Context, resp PlayerStatsResponse, fullStats *StatsFromMatch) (RedCardsHome uint8, RedCardsAway uint8) {
+func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsResponse, fullStats *StatsFromMatch) (RedCardsHome uint8, RedCardsAway uint8) {
 	fullStats.playersStatsHome = make(map[uint32]*models.PlayerStatsInMatch, len(resp.HomeTeam.Players))
 	fullStats.playersStatsAway = make(map[uint32]*models.PlayerStatsInMatch, len(resp.AwayTeam.Players))
 	fullStats.goalieStatsHome = make(map[uint32]*models.GoalieStatsInMatch, 3)
@@ -852,7 +853,7 @@ func (u *Updater) PSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 	return
 }
 
-func (u *Updater) IResponseToPS(ctx context.Context, incidents IncidentsResponse, stats *StatsFromMatch, url string) {
+func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse, stats *StatsFromMatch, url string) {
 	for _, incident := range incidents.Incidents {
 		if incident.IncidentType == "goal" {
 			if incident.IncidentClass == "regular" {

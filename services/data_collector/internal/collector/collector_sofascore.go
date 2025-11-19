@@ -483,7 +483,7 @@ func (u *Updater) fetchAllStatisticsFromMatches(ctx context.Context, matchID str
 		return StatsFromMatch{}, err
 	}
 
-	res.teamStats.RedCardsHome, res.teamStats.RedCardsAway = u.pSResponseToPSStructs(ctx, playerStatsMatchResp, &res)
+	_, _ = u.pSResponseToPSStructs(ctx, playerStatsMatchResp, &res)
 
 	incidentsBody, err := u.api.FetchBodyConc(ctx, urlIncidents)
 	if err != nil {
@@ -679,6 +679,9 @@ func TSResponseToTSStruct(resp TeamStatsResponse) models.TeamMatchStats {
 				case "Yellow cards":
 					res.YellowCardsHome = uint8(stat.Home)
 					res.YellowCardsAway = uint8(stat.Away)
+				case "Red cards":
+					res.RedCardsHome = uint8(stat.Home)
+					res.RedCardsAway = uint8(stat.Away)
 				case "Passes":
 					res.TotalPassesHome = uint16(stat.Home)
 					res.TotalPassesAway = uint16(stat.Away)

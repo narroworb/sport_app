@@ -40,13 +40,22 @@ type DatabaseInterface interface {
 	GetCountPlayersStatsByMatchID(ctx context.Context, matchID uint32) (uint64, error)
 }
 
-type Updater struct {
-	db DatabaseInterface
+type SofaApi interface {
+	FetchBodyConc(ctx context.Context, url string) (string, error)
+	FindManagersOfMatch(url string) (homeID, awayID string)
 }
+
+type Updater struct {
+	db  DatabaseInterface
+	api SofaApi
+}
+
+type ApiClient struct{}
 
 func NewUpdater(db DatabaseInterface) *Updater {
 	return &Updater{
-		db: db,
+		db:  db,
+		api: &ApiClient{},
 	}
 }
 
@@ -102,7 +111,7 @@ func (u *Updater) StartUpdate() {
 		tournamentToUpdateInfo := tournamentToUpdateInfo
 		tasks <- func(ctx context.Context) {
 			url := tournamentToUpdateInfo.baseURL + "/standings/total"
-			body, err := fetchBodyConc(ctx, url)
+			body, err := u.api.FetchBodyConc(ctx, url)
 			if err != nil {
 				log.Printf("Ошибка при запросе %s: %v\n", url, err)
 				return
@@ -235,7 +244,7 @@ func (u *Updater) StartUpdate() {
 	log.Println("update done succesfully")
 }
 
-func fetchBodyConc(ctx context.Context, url string) (string, error) {
+func (a *ApiClient) FetchBodyConc(ctx context.Context, url string) (string, error) {
 	var body string
 	err := chromedp.Run(ctx,
 		chromedp.Navigate(url),
@@ -293,7 +302,7 @@ type MatchesResponse struct {
 
 func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uint16, allTeams map[string]*models.Team) ([]models.Match, error) {
 	url := fmt.Sprintf("%s/events/round/%d", url_base, roundID)
-	body, err := fetchBodyConc(ctx, url)
+	body, err := u.api.FetchBodyConc(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -310,14 +319,14 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 	matches := make([]models.Match, 0, len(result.Events))
 	for _, e := range result.Events {
 		url := fmt.Sprintf("https://www.sofascore.com/football/match/%s/%s#id:%d", e.Slug, e.CustomID, e.ID)
-		homeManagerID, awayManagerID := findManagersOfMatch(url)
-		homeManager, err := fetchManager(ctx, homeManagerID)
+		homeManagerID, awayManagerID := u.api.FindManagersOfMatch(url)
+		homeManager, err := u.fetchManager(ctx, homeManagerID)
 		if err != nil || (homeManager.FirstName == "" && homeManager.LastName == "") {
 			log.Printf("Home manager from match %s - %s by url %s not found.\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
 			homeManager = models.Manager{FirstName: "Not", LastName: "Find"}
 		}
 
-		awayManager, err := fetchManager(ctx, awayManagerID)
+		awayManager, err := u.fetchManager(ctx, awayManagerID)
 		if err != nil || (awayManager.FirstName == "" && awayManager.LastName == "") {
 			log.Printf("Away manager from match %s - %s by url %s not found.\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
 			awayManager = models.Manager{FirstName: "Not", LastName: "Find"}
@@ -354,7 +363,7 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 	return matches, nil
 }
 
-func findManagersOfMatch(url string) (homeID, awayID string) {
+func (a *ApiClient) FindManagersOfMatch(url string) (homeID, awayID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
@@ -397,9 +406,9 @@ type ManagerResponse struct {
 	} `json:"manager"`
 }
 
-func fetchManager(ctx context.Context, managerID string) (manager models.Manager, err error) {
+func (u *Updater) fetchManager(ctx context.Context, managerID string) (manager models.Manager, err error) {
 	url := fmt.Sprintf("https://api.sofascore.com/api/v1/manager/%s", managerID)
-	body, err := fetchBodyConc(ctx, url)
+	body, err := u.api.FetchBodyConc(ctx, url)
 	if err != nil {
 		return
 	}
@@ -439,7 +448,7 @@ func (u *Updater) fetchAllStatisticsFromMatches(ctx context.Context, matchID str
 	urlTeams := fmt.Sprintf("https://api.sofascore.com/api/v1/event/%s/statistics", matchID)
 	urlIncidents := fmt.Sprintf("https://api.sofascore.com/api/v1/event/%s/incidents", matchID)
 
-	teamStatsBody, err := fetchBodyConc(ctx, urlTeams)
+	teamStatsBody, err := u.api.FetchBodyConc(ctx, urlTeams)
 	if err != nil {
 		return StatsFromMatch{}, err
 	}
@@ -458,7 +467,7 @@ func (u *Updater) fetchAllStatisticsFromMatches(ctx context.Context, matchID str
 
 	res.teamStats = TSResponseToTSStruct(teamStatsMatchResp)
 
-	playersStatsBody, err := fetchBodyConc(ctx, urlPlayers)
+	playersStatsBody, err := u.api.FetchBodyConc(ctx, urlPlayers)
 	if err != nil {
 		return StatsFromMatch{}, err
 	}
@@ -476,7 +485,7 @@ func (u *Updater) fetchAllStatisticsFromMatches(ctx context.Context, matchID str
 
 	res.teamStats.RedCardsHome, res.teamStats.RedCardsAway = u.pSResponseToPSStructs(ctx, playerStatsMatchResp, &res)
 
-	incidentsBody, err := fetchBodyConc(ctx, urlIncidents)
+	incidentsBody, err := u.api.FetchBodyConc(ctx, urlIncidents)
 	if err != nil {
 		return StatsFromMatch{}, err
 	}
@@ -699,7 +708,7 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 	for _, p := range resp.HomeTeam.Players {
 		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, p.Player.Position, p.Player.Height)
 		if err != nil || id == 0 {
-			player, err := fetchPlayer(ctx, p.Player.ID)
+			player, err := u.fetchPlayer(ctx, p.Player.ID)
 			if err != nil {
 				log.Printf("Ошибка в получении данных игрока %s: %v\n", p.Player.Name, err)
 				continue
@@ -776,7 +785,7 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 	for _, p := range resp.AwayTeam.Players {
 		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, p.Player.Position, p.Player.Height)
 		if err != nil || id == 0 {
-			player, err := fetchPlayer(ctx, p.Player.ID)
+			player, err := u.fetchPlayer(ctx, p.Player.ID)
 			if err != nil {
 				log.Printf("Ошибка в получении данных игрока %s: %v\n", p.Player.Name, err)
 				continue
@@ -1063,9 +1072,9 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 	}
 }
 
-func fetchPlayer(ctx context.Context, idPlayer int) (*models.Player, error) {
+func (u *Updater) fetchPlayer(ctx context.Context, idPlayer int) (*models.Player, error) {
 	url := fmt.Sprintf("https://api.sofascore.com/api/v1/player/%d", idPlayer)
-	body, err := fetchBodyConc(ctx, url)
+	body, err := u.api.FetchBodyConc(ctx, url)
 	if err != nil {
 		return nil, err
 	}

@@ -10,8 +10,8 @@ services:
         soft: 262144
         hard: 262144
     volumes:
-      - ./internal/database/clickhouse-data:/var/lib/clickhouse/data
-      - ./internal/database/logs:/var/log/clickhouse-server
+      - ch_data:/var/lib/clickhouse
+      - ch_logs:/var/log/clickhouse-server
     ports:
       - "9000:9000"
       - "8123:8123"
@@ -33,3 +33,7 @@ services:
     restart: always
     ports:
       - "8090:8090"
+
+volumes:
+  ch_data:
+  ch_logs:

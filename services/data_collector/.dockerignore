@@ -3,6 +3,7 @@
 *.gz
 *.sql
 *.gitignore
+*.out
 backup/
 internal/database/clickhouse-data/
 internal/database/logs/

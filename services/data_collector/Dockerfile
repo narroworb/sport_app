@@ -15,6 +15,10 @@ WORKDIR /app
 
 COPY --from=builder /bin/data_collector /app/data_collector
 
+RUN apk update
+
+RUN apk add chromium
+
 ENV DATABASE_ADDR=${DATABASE_ADDR}
 ENV DB_NAME=${DB_NAME}
 ENV DB_USER=${DB_USER}

@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"time"
 
 	"github.com/narroworb/data_collector/internal/models"
 	"github.com/stretchr/testify/mock"
@@ -56,8 +57,8 @@ func (m *MockDB) InsertFootballMatch(ctx context.Context, match *models.Match, t
 	return args.Get(0).(uint32), args.Error(1)
 }
 
-func (m *MockDB) GetFootballPlayerID(ctx context.Context, name string, position string, height uint16) (uint32, error) {
-	args := m.Called(ctx, name, position, height)
+func (m *MockDB) GetFootballPlayerID(ctx context.Context, name string, dateOfBirth time.Time) (uint32, error) {
+	args := m.Called(ctx, name, dateOfBirth)
 	return args.Get(0).(uint32), args.Error(1)
 }
 
@@ -140,7 +141,27 @@ func (m *MockApi) FetchBodyConc(ctx context.Context, url string) (string, error)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockApi) FindManagersOfMatch(url string) (homeID, awayID string) {
-	args := m.Called(url)
+func (m *MockApi) FindManagersOfMatch(ctx context.Context, url string) (homeID, awayID string) {
+	args := m.Called(ctx, url)
 	return args.String(0), args.String(1)
+}
+
+func (m *MockDB) InsertFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error {
+	args := m.Called(ctx, rowTable, tournamentID)
+	return args.Error(0)
+}
+
+func (m *MockDB) UpdateFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error {
+	args := m.Called(ctx, rowTable, tournamentID, statID)
+	return args.Error(0)
+}
+
+func (m *MockDB) GetFootballTeamTournamentPerformanceID(ctx context.Context, tournamentID uint32, teamID uint32) (uint32, error) {
+	args := m.Called(ctx, tournamentID, teamID)
+	return args.Get(0).(uint32), args.Error(1)
+}
+
+func (m *MockDB) GetUpcomingTours(ctx context.Context) ([]UnactualTournamentsAndTours, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]UnactualTournamentsAndTours), args.Error(1)
 }

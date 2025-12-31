@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/narroworb/data_collector/internal/collector"
@@ -254,7 +255,7 @@ func (c *ClichouseDB) nextFootballMatchID() uint32 {
 	return atomic.AddUint32(&c.maxID.match, 1)
 }
 
-func (c *ClichouseDB) GetFootballPlayerID(ctx context.Context, name string, position string, height uint16) (uint32, error) {
+func (c *ClichouseDB) GetFootballPlayerID_(ctx context.Context, name string, position string, height uint16) (uint32, error) {
 	firstName := strings.Split(name, " ")[0]
 	lastName := strings.TrimSpace(strings.Join(strings.Split(name, " ")[1:], " "))
 	if lastName == "" {
@@ -265,6 +266,24 @@ func (c *ClichouseDB) GetFootballPlayerID(ctx context.Context, name string, posi
 		`SELECT athlete_id FROM Athletes
 		WHERE sport_id=1 AND first_name=$1 AND last_name=$2 AND position=$3 AND height=$4`,
 		firstName, lastName, position, height)
+	var id uint32
+	if err := row.Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func (c *ClichouseDB) GetFootballPlayerID(ctx context.Context, name string, dateOfBirth time.Time) (uint32, error) {
+	firstName := strings.Split(name, " ")[0]
+	lastName := strings.TrimSpace(strings.Join(strings.Split(name, " ")[1:], " "))
+	if lastName == "" {
+		lastName = firstName
+		firstName = ""
+	}
+	row := c.conn.QueryRow(ctx,
+		`SELECT athlete_id FROM Athletes
+		WHERE sport_id=1 AND first_name=$1 AND last_name=$2 AND date_of_birth=$3`,
+		firstName, lastName, dateOfBirth)
 	var id uint32
 	if err := row.Scan(&id); err != nil {
 		return 0, err
@@ -556,4 +575,156 @@ func (c *ClichouseDB) GetCountPlayersStatsByMatchID(ctx context.Context, matchID
 		return 0, err
 	}
 	return cnt, nil
+}
+
+func (c *ClichouseDB) InsertFootballGoalieMatchStatsBatchNotPointer(ctx context.Context, statsBatch map[uint32]models.GoalieStatsInMatch, matchID uint32) error {
+	if len(statsBatch) == 0 {
+		return fmt.Errorf("empty batch")
+	}
+
+	batchInsert, err := c.conn.PrepareBatch(ctx, `INSERT INTO Football_Goalie_Match_Stats (stat_id, match_id, athlete_id, start_player, rating, minutes_played, goals, assists, goals_conceded, saves,
+	pass_attempts, complete_passes, key_passes, penalty_saved, penalty_conceded, fouls, was_fouled, yellow_cards, red_cards, captain, home_team_player)`)
+	if err != nil {
+		return fmt.Errorf("ошибка при подготовке батча: %v", err)
+	}
+
+	for _, stats := range statsBatch {
+		if stats.IDPlayer < 1 {
+			log.Printf("try inserting goalie stats with ID=0. matchID: %d, stats: %+v", matchID, stats)
+			continue
+		}
+
+		var startPlayer, captain, homeTeamPlayer uint8
+		if stats.StartPlayer {
+			startPlayer = 1
+		}
+		if stats.Captain {
+			captain = 1
+		}
+		if stats.HomeTeamPlayer {
+			homeTeamPlayer = 1
+		}
+
+		if err := batchInsert.Append(c.nextFootballGoalieMatchStatID(), matchID, stats.IDPlayer, startPlayer, fmt.Sprintf("%.1f", stats.Rating), stats.MinutesPlayed, stats.Goals, stats.Assists, stats.GoalsConceded, stats.Saves,
+			stats.PassAttempts, stats.CompletePasses, stats.KeyPasses, stats.PenaltySaved, stats.PenaltyConceded, stats.Fouls, stats.WasFouled, stats.YellowCards,
+			stats.RedCards, captain, homeTeamPlayer); err != nil {
+			return fmt.Errorf("ошибка при добавлении в батч: %v", err)
+		}
+	}
+
+	if err := batchInsert.Send(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) InsertFootballPlayerMatchStatsBatchNotPointer(ctx context.Context, statsBatch map[uint32]models.PlayerStatsInMatch, matchID uint32) error {
+	if len(statsBatch) == 0 {
+		return fmt.Errorf("empty batch")
+	}
+
+	batchInsert, err := c.conn.PrepareBatch(ctx, `INSERT INTO Football_Player_Match_Stats (stat_id, match_id, athlete_id, start_player, rating, minutes_played, goals, assists, blocked_shots, interceptions, total_tackles,
+		dribbled_past, duels, duels_won, fouls, was_fouled, pass_attempts, complete_passes, key_passes, shot_on_target, total_shots, dribble_attempts, complete_dribbles,
+		penalty_scored, penalty_missed, yellow_cards, red_cards, captain, home_team_player)`)
+	if err != nil {
+		return fmt.Errorf("ошибка при подготовке батча: %v", err)
+	}
+
+	for _, stats := range statsBatch {
+		if stats.IDPlayer < 1 {
+			log.Printf("try inserting player stats with ID=0. matchID: %d, stats: %+v", matchID, stats)
+			continue
+		}
+
+		var startPlayer, captain, homeTeamPlayer uint8
+		if stats.StartPlayer {
+			startPlayer = 1
+		}
+		if stats.Captain {
+			captain = 1
+		}
+		if stats.HomeTeamPlayer {
+			homeTeamPlayer = 1
+		}
+
+		if err := batchInsert.Append(c.nextFootballPlayerMatchStatID(), matchID, stats.IDPlayer, startPlayer, fmt.Sprintf("%.1f", stats.Rating), stats.MinutesPlayed, stats.Goals, stats.Assists, stats.BlockedShots, stats.Interceptions,
+			stats.TotalTackles, stats.DribbledPast, stats.Duels, stats.DuelsWon, stats.Fouls, stats.WasFouled, stats.PassAttempts, stats.CompletePasses,
+			stats.KeyPasses, stats.ShotsOnTarget, stats.TotalShots, stats.DribbleAttempts, stats.CompleteDribbles, stats.PenaltyScored, stats.PenaltyMissed,
+			stats.YellowCards, stats.RedCards, captain, homeTeamPlayer); err != nil {
+			return fmt.Errorf("ошибка при добавлении в батч: %v", err)
+		}
+	}
+
+	if err := batchInsert.Send(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) GetFootballTeamTournamentPerformanceID(ctx context.Context, tournamentID uint32, teamID uint32) (uint32, error) {
+	row := c.conn.QueryRow(ctx,
+		`SELECT performance_id FROM Team_Tournament_Performances
+		WHERE tournament_id=$1 AND team_id=$2`,
+		tournamentID, teamID)
+	var id uint32
+	if err := row.Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func (c *ClichouseDB) nextFootballTeamTournamentPerformanceID() uint32 {
+	return atomic.AddUint32(&c.maxID.teamPerformance, 1)
+}
+
+func (c *ClichouseDB) InsertFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error {
+	id := c.nextFootballTeamTournamentPerformanceID()
+	err := c.conn.Exec(ctx,
+		`INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		id, tournamentID, rowTable.Team.ID, rowTable.Points, rowTable.Pos, rowTable.Matches, rowTable.Wins, rowTable.Draws, rowTable.Losses, rowTable.ScoresFor, rowTable.ScoresAgainst)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) UpdateFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error {
+	err := c.conn.Exec(ctx,
+		`INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		statID, tournamentID, rowTable.Team.ID, rowTable.Points, rowTable.Pos, rowTable.Matches, rowTable.Wins, rowTable.Draws, rowTable.Losses, rowTable.ScoresFor, rowTable.ScoresAgainst)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) GetUpcomingTours(ctx context.Context) ([]collector.UnactualTournamentsAndTours, error) {
+	rows, err := c.conn.Query(ctx, "SELECT t.name, t.season, MAX(m.round) FROM Tournaments t INNER JOIN Matches m ON m.tournament_id=t.tournament_id WHERE t.season='2025/2026' AND m.status='Ended' GROUP BY t.name, t.season")
+	if err != nil {
+		return nil, fmt.Errorf("error in query to db: %+v", err)
+	}
+
+	defer rows.Close()
+	res := make([]collector.UnactualTournamentsAndTours, 0, 10)
+
+	for rows.Next() {
+		var leagueName, season string
+		var tour uint16
+
+		if err := rows.Scan(&leagueName, &season, &tour); err != nil {
+			return nil, fmt.Errorf("error in scan query: %+v", err)
+		}
+
+		res = append(res, collector.UnactualTournamentsAndTours{
+			LeagueName: leagueName,
+			Season:     season,
+			Tours:      make([]uint16, 0, 3),
+		})
+
+		res[len(res)-1].Tours = append(res[len(res)-1].Tours, tour, tour+1, tour+2)
+	}
+
+	return res, nil
 }

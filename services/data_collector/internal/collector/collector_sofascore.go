@@ -23,7 +23,7 @@ type DatabaseInterface interface {
 	GetFootballMatchStatus(ctx context.Context, matchID uint32) (string, error)
 	UpdateFootballMatch(ctx context.Context, match *models.Match) error
 	InsertFootballMatch(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
-	GetFootballPlayerID(ctx context.Context, name string, position string, height uint16) (uint32, error)
+	GetFootballPlayerID(ctx context.Context, name string, dateOfBirth time.Time) (uint32, error)
 	InsertFootballPlayer(ctx context.Context, player *models.Player) (uint32, error)
 	IncrementYellowCardsManager(ctx context.Context, managerID uint32) error
 	IncrementRedCardsManager(ctx context.Context, managerID uint32) error
@@ -38,24 +38,56 @@ type DatabaseInterface interface {
 	GetFootballNotPlayedMatchID(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetFootballPlayedMatchID(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetCountPlayersStatsByMatchID(ctx context.Context, matchID uint32) (uint64, error)
+	GetFootballTeamTournamentPerformanceID(ctx context.Context, tournamentID uint32, teamID uint32) (uint32, error)
+	InsertFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error
+	UpdateFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error
+	GetUpcomingTours(ctx context.Context) ([]UnactualTournamentsAndTours, error)
 }
 
 type SofaApi interface {
 	FetchBodyConc(ctx context.Context, url string) (string, error)
-	FindManagersOfMatch(url string) (homeID, awayID string)
+	FindManagersOfMatch(ctx context.Context, url string) (homeID, awayID string)
+}
+
+type Producer interface {
+	Send(ctx context.Context, key string, msg any) error
 }
 
 type Updater struct {
-	db  DatabaseInterface
-	api SofaApi
+	db       DatabaseInterface
+	api      SofaApi
+	producer Producer
 }
 
-type ApiClient struct{}
+type ApiClient struct {
+	browserCtx context.Context
+}
 
-func NewUpdater(db DatabaseInterface) *Updater {
+func newApiClient() *ApiClient {
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		// chromedp.ExecPath("/usr/bin/chromium"),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-software-rasterizer", true),
+		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "+
+			"AppleWebKit/537.36 (KHTML, like Gecko) "+
+			"Chrome/117.0.0.0 Safari/537.36"),
+	)
+
+	allocCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
+	browserCtx, _ := chromedp.NewContext(allocCtx)
+
+	return &ApiClient{browserCtx: browserCtx}
+}
+
+func NewUpdater(db DatabaseInterface, producer Producer) *Updater {
 	return &Updater{
-		db:  db,
-		api: &ApiClient{},
+		db:       db,
+		api:      newApiClient(),
+		producer: producer,
 	}
 }
 
@@ -73,6 +105,11 @@ func (u *Updater) StartUpdate() {
 	dataToCollect, err := u.db.GetUnactualTournamentsAndTours(ctx)
 	if err != nil {
 		log.Printf("error in get data from clickhouse: %v\n", err)
+		return
+	}
+
+	if len(dataToCollect) == 0 {
+		log.Println("there is nothing to update wits stats, end of operation!")
 		return
 	}
 
@@ -95,13 +132,16 @@ func (u *Updater) StartUpdate() {
 
 	for i := 0; i < maxWorkers; i++ {
 		go func() {
-			ctx, cancel := chromedp.NewContext(context.Background())
-			defer cancel()
+			workerCtx, _ := chromedp.NewContext(u.api.(*ApiClient).browserCtx)
+
+			// fmt.Println(u.api.FindManagersOfMatch(workerCtx, "https://www.sofascore.com/football/match/sc-heerenveen-az-alkmaar/ajbsojb#id:14053614"))
+
 			for task := range tasks {
-				task(ctx)
+				// ctx, cancel := context.WithTimeout(workerCtx, 40*time.Second)
+				task(workerCtx)
+				// cancel()
 				wg.Done()
 			}
-			chromedp.Cancel(ctx)
 		}()
 	}
 
@@ -164,13 +204,23 @@ func (u *Updater) StartUpdate() {
 					Pos:           row.Pos,
 					Matches:       row.Matches,
 					Wins:          row.Wins,
-					Loses:         row.Loses,
+					Losses:        row.Losses,
 					Draws:         row.Draws,
 					ScoresFor:     row.ScoresFor,
 					ScoresAgainst: row.ScoresAgainst,
 				}
 				season.Table[row.Pos] = row
 				season.Teams[row.Team.Name] = team
+
+				if id, err := u.db.GetFootballTeamTournamentPerformanceID(ctx, seasonID, row.Team.ID); err != nil {
+					if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
+						fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					}
+				} else {
+					if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
+						fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					}
+				}
 			}
 
 			fmt.Println("Обработка туров", tournamentToUpdateInfo.leagueName, season.Year)
@@ -193,7 +243,7 @@ func (u *Updater) StartUpdate() {
 						log.Printf("Матч %s - %s от %s уже в базе и требует доп обработки.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
 						matches[indMatch].IDAppDB = id
 					} else if id, err := u.db.GetFootballNotPlayedMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
-						log.Printf("Матч %s - %s от %s уже в базе.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+						log.Printf("Матч %s - %s от %s уже в базе со статусом 'Не сыгран'.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
 						matches[indMatch].IDAppDB = id
 						err := u.db.UpdateFootballMatch(ctx, &(matches[indMatch]))
 						if err != nil {
@@ -239,9 +289,189 @@ func (u *Updater) StartUpdate() {
 			}
 		}
 	}
-	wg.Wait()
 	close(tasks)
+	wg.Wait()
+	chromedp.Cancel(u.api.(*ApiClient).browserCtx)
 	log.Println("update done succesfully")
+}
+
+func (u *Updater) StartUpdateWithoutStatistics() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dataToCollect, err := u.db.GetUpcomingTours(ctx)
+	if err != nil {
+		log.Printf("error in get data from clickhouse: %v\n", err)
+		return
+	}
+
+	dataToCollectForApi := make([]tournamentForApi, 0, len(dataToCollect))
+
+	for _, d := range dataToCollect {
+		dataToCollectForApi = append(dataToCollectForApi,
+			tournamentForApi{
+				baseURL:    tournaments[d.LeagueName] + seasonsIDs[d.Season][d.LeagueName],
+				leagueName: d.LeagueName,
+				season:     d.Season,
+				tours:      d.Tours,
+			},
+		)
+	}
+
+	const maxWorkers = 5
+	tasks := make(chan func(context.Context), 50)
+	wg := &sync.WaitGroup{}
+
+	for i := 0; i < maxWorkers; i++ {
+		go func() {
+			workerCtx, _ := chromedp.NewContext(u.api.(*ApiClient).browserCtx)
+
+			for task := range tasks {
+				task(workerCtx)
+				wg.Done()
+			}
+		}()
+	}
+
+	for _, tournamentToUpdateInfo := range dataToCollectForApi {
+		wg.Add(1)
+
+		tournamentToUpdateInfo := tournamentToUpdateInfo
+		tasks <- func(ctx context.Context) {
+			url := tournamentToUpdateInfo.baseURL + "/standings/total"
+			body, err := u.api.FetchBodyConc(ctx, url)
+			if err != nil {
+				log.Printf("Ошибка при запросе %s: %v\n", url, err)
+				return
+			}
+
+			var r StandingsResponse
+			if len(body) < 5 {
+				return
+			}
+			body = strings.TrimSuffix(body[5:], `</pre><div class="json-formatter-container"></div>`)
+			if err := json.Unmarshal([]byte(body), &r); err != nil {
+				log.Printf("Ошибка JSON: %v\n", err)
+				return
+			}
+
+			season := models.Season{
+				Year:  tournamentToUpdateInfo.season,
+				Table: make(map[uint8]models.TableRow, len(r.Standings[0].Rows)),
+				Teams: make(map[string]*models.Team, len(r.Standings[0].Rows)),
+				Tours: make(map[uint16][]models.Match, (len(r.Standings[0].Rows)-1)*2),
+			}
+
+			log.Printf("Start to fetch season %s %s\n", tournamentToUpdateInfo.leagueName, tournamentToUpdateInfo.season)
+
+			var seasonID uint32
+			if seasonID, err = u.db.GetFootballTournamentID(ctx, tournamentToUpdateInfo.leagueName, tournamentToUpdateInfo.season); err != nil || seasonID == 0 {
+				log.Printf("Season %s %s not found in db. err: %v\n", tournamentToUpdateInfo.leagueName, tournamentToUpdateInfo.season, err)
+				return
+			} else {
+				log.Printf("Season %s %s is currently in DB with ID %d\n", tournamentToUpdateInfo.leagueName, tournamentToUpdateInfo.season, seasonID)
+			}
+
+			for _, row := range r.Standings[0].Rows {
+				// log.Printf("Start to fetch team %s\n", row.Team.Name)
+
+				teamID, err := u.db.GetFootballTeamID(ctx, row.Team.Name)
+				if err != nil {
+					log.Printf("error in get team %s from db: %v\n", row.Team.Name, err)
+					return
+				}
+
+				team := &models.Team{
+					Name: row.Team.Name,
+					ID:   teamID,
+				}
+
+				row := models.TableRow{
+					Team:          team,
+					Points:        row.Points,
+					Pos:           row.Pos,
+					Matches:       row.Matches,
+					Wins:          row.Wins,
+					Losses:        row.Losses,
+					Draws:         row.Draws,
+					ScoresFor:     row.ScoresFor,
+					ScoresAgainst: row.ScoresAgainst,
+				}
+				season.Table[row.Pos] = row
+				season.Teams[row.Team.Name] = team
+
+				if id, err := u.db.GetFootballTeamTournamentPerformanceID(ctx, seasonID, row.Team.ID); err != nil {
+					if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
+						fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					}
+				} else {
+					if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
+						fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					}
+				}
+			}
+
+			fmt.Println("Обработка туров", tournamentToUpdateInfo.leagueName, season.Year)
+			for _, tour := range tournamentToUpdateInfo.tours {
+				log.Printf("парсинг %d тура лиги %s %s\n", tour, tournamentToUpdateInfo.leagueName, season.Year)
+				matches, err := u.fetchMatches(ctx, tournamentToUpdateInfo.baseURL, tour, season.Teams)
+				if err != nil {
+					log.Printf("Ошибка при обработке матчей %d тура лиги %s %s: %v\n", tour, tournamentToUpdateInfo.leagueName, season.Year, err)
+					continue
+				}
+				log.Printf("данные %d тура лиги %s %s получены.\n", tour, tournamentToUpdateInfo.leagueName, season.Year)
+
+				for indMatch, match := range matches {
+					log.Printf("Матч %s - %s от %s в обработке. \n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+					if id, err := u.db.GetFootballPlayedMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
+						log.Printf("Матч %s - %s от %s уже в базе и полностью обработан.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+						continue
+					} else if id, err := u.db.GetFootballNotPlayedMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
+						log.Printf("Матч %s - %s от %s уже в базе со статусом 'Не сыгран'.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+						matches[indMatch].IDAppDB = id
+						err := u.db.UpdateFootballMatch(ctx, &(matches[indMatch]))
+						if err != nil {
+							log.Printf("error in updating match %+v: %v\n", matches[indMatch], err)
+							continue
+						}
+					} else if id, err := u.db.GetFootballMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
+						log.Printf("Матч %s - %s от %s уже в базе.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+						matches[indMatch].IDAppDB = id
+						status, err := u.db.GetFootballMatchStatus(ctx, id)
+						if err != nil {
+							log.Printf("error in find match status: %v\n", err)
+							continue
+						}
+						if status != matches[indMatch].Status {
+							err := u.db.UpdateFootballMatch(ctx, &(matches[indMatch]))
+							if err != nil {
+								log.Printf("error in updating match %+v: %v\n", matches[indMatch], err)
+								continue
+							}
+						} else {
+							log.Printf("Матч %s - %s от %s был обработан ранее.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+							continue
+						}
+					} else {
+						id, err := u.db.InsertFootballMatch(ctx, &(matches[indMatch]), seasonID)
+						matches[indMatch].IDAppDB = id
+						if err != nil {
+							log.Printf("error in insert match: %v\n", err)
+							continue
+						}
+					}
+
+					log.Printf("Матч %s - %s от %s обновлен.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+				}
+
+				log.Printf("Тур %d лиги %s %s обработан полностью\n", tour, tournamentToUpdateInfo.leagueName, tournamentToUpdateInfo.season)
+			}
+		}
+	}
+	close(tasks)
+	wg.Wait()
+	chromedp.Cancel(u.api.(*ApiClient).browserCtx)
+	log.Println("update without statistics done succesfully")
 }
 
 func (a *ApiClient) FetchBodyConc(ctx context.Context, url string) (string, error) {
@@ -253,7 +483,8 @@ func (a *ApiClient) FetchBodyConc(ctx context.Context, url string) (string, erro
 	)
 	if len(body) < 5 || strings.TrimSuffix(body[5:], `</pre><div class="json-formatter-container"></div>`) == `{"error": {"code": 403, "reason": "challenge" }}` {
 		log.Printf("Error in fetching body of url: %s\n", url)
-		return "", fmt.Errorf(`get error with code 403 by reason "challenge""`)
+		fmt.Println(body)
+		return "", fmt.Errorf(`get error with code 403 by reason "challenge"`)
 	}
 	return body, err
 }
@@ -268,7 +499,7 @@ type StandingsResponse struct {
 			Pos           uint8  `json:"position"`
 			Matches       uint16 `json:"matches"`
 			Wins          uint16 `json:"wins"`
-			Loses         uint16 `json:"loses"`
+			Losses        uint16 `json:"losses"`
 			Draws         uint16 `json:"draws"`
 			ScoresFor     uint16 `json:"scoresFor"`
 			ScoresAgainst uint16 `json:"scoresAgainst"`
@@ -319,7 +550,19 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 	matches := make([]models.Match, 0, len(result.Events))
 	for _, e := range result.Events {
 		url := fmt.Sprintf("https://www.sofascore.com/football/match/%s/%s#id:%d", e.Slug, e.CustomID, e.ID)
-		homeManagerID, awayManagerID := u.api.FindManagersOfMatch(url)
+		homeManagerID, awayManagerID := u.api.FindManagersOfMatch(ctx, url)
+		if homeManagerID == "" && awayManagerID == "" {
+			log.Printf("first attempt to find managers of match %s - %s by url=%s is failed\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
+			for attempt := 2; attempt <= 3; attempt++ {
+				time.Sleep(time.Second * 5)
+				homeManagerID, awayManagerID = u.api.FindManagersOfMatch(ctx, url)
+				if homeManagerID != "" || awayManagerID != "" {
+					log.Printf("attempt %d to find managers of match %s - %s by url=%s is success\n", attempt, e.HomeTeam.Name, e.AwayTeam.Name, url)
+					break
+				}
+				log.Printf("attempt %d to find managers of match %s - %s by url=%s is failed\n", attempt, e.HomeTeam.Name, e.AwayTeam.Name, url)
+			}
+		}
 		homeManager, err := u.fetchManager(ctx, homeManagerID)
 		if err != nil || (homeManager.FirstName == "" && homeManager.LastName == "") {
 			log.Printf("Home manager from match %s - %s by url %s not found.\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
@@ -348,7 +591,7 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 
 		matches = append(matches, models.Match{
 			ID:          e.ID,
-			Date:        time.Unix(e.StartTime, 0),
+			Date:        time.Unix(e.StartTime, 0).Add(time.Hour * 3),
 			HomeTeam:    allTeams[e.HomeTeam.Name],
 			AwayTeam:    allTeams[e.AwayTeam.Name],
 			HomeGoals:   uint16(e.HomeScore.Display),
@@ -363,18 +606,18 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 	return matches, nil
 }
 
-func (a *ApiClient) FindManagersOfMatch(url string) (homeID, awayID string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+func (a *ApiClient) FindManagersOfMatch(ctx context.Context, url string) (homeID, awayID string) {
+	ctxTimeout, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
-	ctx, cancel = chromedp.NewContext(ctx)
-	defer cancel()
+	// ctx, cancel = chromedp.NewContext(ctxTimeout)
+	// defer cancel()
 
 	var htmls []string
 
 	js := `Array.from(document.querySelectorAll('img[src*="manager"]')).map(el => el.outerHTML)`
 
-	err := chromedp.Run(ctx,
+	err := chromedp.Run(ctxTimeout,
 		chromedp.Navigate(url),
 		chromedp.WaitVisible("body", chromedp.ByQuery),
 		chromedp.Evaluate(js, &htmls),
@@ -626,9 +869,10 @@ type PlayerStatsResponse struct {
 type IncidentsResponse struct {
 	Incidents []struct {
 		Player struct {
-			Name     string `json:"name"`
-			Position string `json:"position"`
-			Height   uint16 `json:"height"`
+			Name                 string `json:"name"`
+			Position             string `json:"position"`
+			Height               uint16 `json:"height"`
+			DateOfBirthTimeStamp int64  `json:"dateOfBirthTimestamp"`
 		} `json:"player"`
 		Manager struct {
 			Name string `json:"name"`
@@ -636,9 +880,10 @@ type IncidentsResponse struct {
 		FootballPassingNetworkAction []struct {
 			EventType  string `json:"eventType"`
 			Goalkeeper struct {
-				Name     string `json:"name"`
-				Position string `json:"position"`
-				Height   uint16 `json:"height"`
+				Name                 string `json:"name"`
+				Position             string `json:"position"`
+				Height               uint16 `json:"height"`
+				DateOfBirthTimeStamp int64  `json:"dateOfBirthTimestamp"`
 			} `json:"goalkeeper"`
 		} `json:"footballPassingNetworkAction"`
 		IncidentType  string `json:"incidentType"`
@@ -709,7 +954,7 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 	fullStats.goalieStatsAway = make(map[uint32]*models.GoalieStatsInMatch, 3)
 
 	for _, p := range resp.HomeTeam.Players {
-		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, p.Player.Position, p.Player.Height)
+		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, time.Unix(p.Player.DateOfBirthTimeStamp, 0))
 		if err != nil || id == 0 {
 			player, err := u.fetchPlayer(ctx, p.Player.ID)
 			if err != nil {
@@ -786,7 +1031,7 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 	}
 
 	for _, p := range resp.AwayTeam.Players {
-		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, p.Player.Position, p.Player.Height)
+		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, time.Unix(p.Player.DateOfBirthTimeStamp, 0))
 		if err != nil || id == 0 {
 			player, err := u.fetchPlayer(ctx, p.Player.ID)
 			if err != nil {
@@ -884,7 +1129,7 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 					}
 					keeper := incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper
 					// id := db.GetPlayerByName(strings.TrimSpace(incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper.Name)).ID
-					id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(keeper.Name), keeper.Position, keeper.Height)
+					id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(keeper.Name), time.Unix(keeper.DateOfBirthTimeStamp, 0))
 					if err != nil {
 						log.Printf("error in search in incidents home goal: %v, url: %s, incident: %+v\n", err, url, incident)
 						continue
@@ -909,7 +1154,7 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 					}
 					keeper := incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper
 					// id := db.GetPlayerByName(strings.TrimSpace(incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper.Name)).ID
-					id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(keeper.Name), keeper.Position, keeper.Height)
+					id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(keeper.Name), time.Unix(keeper.DateOfBirthTimeStamp, 0))
 					if err != nil {
 						log.Printf("error in search in incidents away goal: %v, url: %s, incident: %+v\n", err, url, incident)
 						continue
@@ -952,10 +1197,14 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						log.Printf("error in search in yellow manager: %v\n", err)
 						continue
 					}
-					u.db.IncrementYellowCardsManager(ctx, id)
+					if err := u.producer.Send(ctx, "IncrementYellowCardsManager|"+fmt.Sprint(id), struct{}{}); err != nil {
+						log.Printf("error in sending in yellow manager: %v\n", err)
+						continue
+					}
+					// u.db.IncrementYellowCardsManager(ctx, id)
 					break
 				}
-				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), incident.Player.Position, incident.Player.Height)
+				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), time.Unix(incident.Player.DateOfBirthTimeStamp, 0))
 				if err != nil {
 					log.Printf("error in search in incidents yellow card: %v, url: %s, incident: %+v\n", err, url, incident)
 					continue
@@ -992,11 +1241,19 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						log.Printf("error in search in yellowRed manager: %v\n", err)
 						continue
 					}
-					u.db.IncrementYellowCardsManager(ctx, id)
-					u.db.IncrementRedCardsManager(ctx, id)
+					if err := u.producer.Send(ctx, "IncrementYellowCardsManager|"+fmt.Sprint(id), struct{}{}); err != nil {
+						log.Printf("error in sending yellow in yellowred manager: %v\n", err)
+						continue
+					}
+					// u.db.IncrementYellowCardsManager(ctx, id)
+					if err := u.producer.Send(ctx, "IncrementRedCardsManager|"+fmt.Sprint(id), struct{}{}); err != nil {
+						log.Printf("error in sending red in yellowred manager: %v\n", err)
+						continue
+					}
+					// u.db.IncrementRedCardsManager(ctx, id)
 					break
 				}
-				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), incident.Player.Position, incident.Player.Height)
+				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), time.Unix(incident.Player.DateOfBirthTimeStamp, 0))
 				if err != nil {
 					log.Printf("error in search in incidents yellow red card: %v, url: %s, incident: %+v\n", err, url, incident)
 					continue
@@ -1037,10 +1294,14 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						log.Printf("error in search in red manager: %v\n", err)
 						continue
 					}
-					u.db.IncrementRedCardsManager(ctx, id)
+					if err := u.producer.Send(ctx, "IncrementRedCardsManager|"+fmt.Sprint(id), struct{}{}); err != nil {
+						log.Printf("error in sending in red manager: %v\n", err)
+						continue
+					}
+					// u.db.IncrementRedCardsManager(ctx, id)
 					break
 				}
-				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), incident.Player.Position, incident.Player.Height)
+				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), time.Unix(incident.Player.DateOfBirthTimeStamp, 0))
 				if err != nil {
 					log.Printf("error in search in incidents red card: %v, url: %s, incident: %+v\n", err, url, incident)
 					continue
@@ -1100,8 +1361,8 @@ func (u *Updater) fetchPlayer(ctx context.Context, idPlayer int) (*models.Player
 	}
 	res.DateOfBirth = time.Unix(playerResp.Player.DateOfBirthTimeStamp, 0)
 	names := strings.Split(playerResp.Player.Name, " ")
-	res.FirstName = names[0]
-	res.LastName = strings.Join(names[1:], " ")
+	res.FirstName = strings.TrimSpace(names[0])
+	res.LastName = strings.TrimSpace(strings.Join(names[1:], " "))
 	if res.LastName == "" {
 		res.LastName = res.FirstName
 		res.FirstName = ""
@@ -1130,23 +1391,45 @@ type PlayerResponse struct {
 
 func (u *Updater) addStatsToDB(ctx context.Context, statsFromMatch StatsFromMatch, matchID uint32) {
 	if id, err := u.db.GetFootballMatchStats(ctx, statsFromMatch.teamStats, matchID); err != nil || id == 0 {
-		_, err := u.db.InsertFootballMatchStats(ctx, statsFromMatch.teamStats, matchID)
-		if err != nil {
-			log.Printf("error in inserting team stats: %v\n", err)
+		// _, err := u.db.InsertFootballMatchStats(ctx, statsFromMatch.teamStats, matchID)
+		// if err != nil {
+		// 	log.Printf("error in inserting team stats: %v\n", err)
+		// }
+
+		if err := u.producer.Send(ctx, "InsertFootballMatchStats|"+fmt.Sprint(matchID), statsFromMatch.teamStats); err != nil {
+			log.Printf("error in sending team stats: %v\n", err)
 		}
 	}
 
-	if err := u.db.InsertFootballGoalieMatchStatsBatch(ctx, statsFromMatch.goalieStatsAway, matchID); err != nil {
-		log.Printf("error in inserting away goalie stats: %v\n", err)
-	}
-	if err := u.db.InsertFootballGoalieMatchStatsBatch(ctx, statsFromMatch.goalieStatsHome, matchID); err != nil {
-		log.Printf("error in inserting home goalie stats: %v\n", err)
+	// if err := u.db.InsertFootballGoalieMatchStatsBatch(ctx, statsFromMatch.goalieStatsAway, matchID); err != nil {
+	// 	log.Printf("error in inserting away goalie stats: %v\n", err)
+	// }
+
+	if err := u.producer.Send(ctx, "InsertFootballGoalieMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.goalieStatsAway); err != nil {
+		log.Printf("error in sending away goalie stats: %v\n", err)
 	}
 
-	if err := u.db.InsertFootballPlayerMatchStatsBatch(ctx, statsFromMatch.playersStatsAway, matchID); err != nil {
-		log.Printf("error in inserting away player stats: %v\n", err)
+	// if err := u.db.InsertFootballGoalieMatchStatsBatch(ctx, statsFromMatch.goalieStatsHome, matchID); err != nil {
+	// 	log.Printf("error in inserting home goalie stats: %v\n", err)
+	// }
+
+	if err := u.producer.Send(ctx, "InsertFootballGoalieMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.goalieStatsHome); err != nil {
+		log.Printf("error in sending home goalie stats: %v\n", err)
 	}
-	if err := u.db.InsertFootballPlayerMatchStatsBatch(ctx, statsFromMatch.playersStatsHome, matchID); err != nil {
-		log.Printf("error in inserting home player stats: %v\n", err)
+
+	// if err := u.db.InsertFootballPlayerMatchStatsBatch(ctx, statsFromMatch.playersStatsAway, matchID); err != nil {
+	// 	log.Printf("error in inserting away player stats: %v\n", err)
+	// }
+
+	if err := u.producer.Send(ctx, "InsertFootballPlayerMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.playersStatsAway); err != nil {
+		log.Printf("error in sending away player stats: %v\n", err)
+	}
+
+	// if err := u.db.InsertFootballPlayerMatchStatsBatch(ctx, statsFromMatch.playersStatsHome, matchID); err != nil {
+	// 	log.Printf("error in inserting home player stats: %v\n", err)
+	// }
+
+	if err := u.producer.Send(ctx, "InsertFootballPlayerMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.playersStatsHome); err != nil {
+		log.Printf("error in sending home player stats: %v\n", err)
 	}
 }

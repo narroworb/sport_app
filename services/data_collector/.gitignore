@@ -1,6 +1,7 @@
 sql_test.sql
 fix_doubles.sql
 fix_bug/
+fix_bug_2/
 clickhouse_data_backup.tar.gz
 /internal/database/clickhouse-data
 /internal/database/logs

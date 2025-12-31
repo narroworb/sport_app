@@ -126,7 +126,7 @@ func (u *Updater) StartUpdate() {
 		)
 	}
 
-	const maxWorkers = 5
+	maxWorkers := min(5, len(dataToCollectForApi))
 	tasks := make(chan func(context.Context), 50)
 	wg := &sync.WaitGroup{}
 
@@ -318,7 +318,7 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 		)
 	}
 
-	const maxWorkers = 5
+	maxWorkers := min(5, len(dataToCollectForApi))
 	tasks := make(chan func(context.Context), 50)
 	wg := &sync.WaitGroup{}
 

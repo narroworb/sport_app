@@ -146,12 +146,12 @@ func (m *MockApi) FindManagersOfMatch(ctx context.Context, url string) (homeID, 
 	return args.String(0), args.String(1)
 }
 
-func (m *MockDB) InsertFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error {
+func (m *MockDB) InsertFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error {
 	args := m.Called(ctx, rowTable, tournamentID)
 	return args.Error(0)
 }
 
-func (m *MockDB) UpdateFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error {
+func (m *MockDB) UpdateFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error {
 	args := m.Called(ctx, rowTable, tournamentID, statID)
 	return args.Error(0)
 }

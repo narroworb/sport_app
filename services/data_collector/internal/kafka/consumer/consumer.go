@@ -21,6 +21,8 @@ type DatabaseInterface interface {
 	InsertFootballMatchStats(ctx context.Context, stats models.TeamMatchStats, matchID uint32) (uint32, error)
 	InsertFootballGoalieMatchStatsBatchNotPointer(ctx context.Context, statsBatch map[uint32]models.GoalieStatsInMatch, matchID uint32) error
 	InsertFootballPlayerMatchStatsBatchNotPointer(ctx context.Context, statsBatch map[uint32]models.PlayerStatsInMatch, matchID uint32) error
+	InsertFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error
+	UpdateFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error
 }
 
 type KafkaConsumer struct {
@@ -148,7 +150,7 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 
 	case "IncrementRedCardsManager":
 		if len(keyParts) != 2 {
-			return fmt.Errorf("received bad key message for incycm")
+			return fmt.Errorf("received bad key message for incrcm")
 		}
 		managerID, err := strconv.Atoi(keyParts[1])
 		if err != nil {
@@ -158,6 +160,46 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 		err = c.db.IncrementRedCardsManager(ctx, uint32(managerID))
 		if err != nil {
 			return fmt.Errorf("error in increment red cards manager: %v", err)
+		}
+	case "InsertFootballTeamTournamentPerformance":
+		if len(keyParts) != 3 {
+			return fmt.Errorf("received bad key message for ifttp")
+		}
+		seasonID, err := strconv.Atoi(keyParts[1])
+		if err != nil {
+			return fmt.Errorf("received bad seasonID in key: %s", keyParts[1])
+		}
+
+		var row models.TableRow
+		if err := json.Unmarshal([]byte(valueOfMessage), &row); err != nil {
+			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
+		}
+
+		err = c.db.InsertFootballTeamTournamentPerformance(ctx, &row, uint32(seasonID))
+		if err != nil {
+			return fmt.Errorf("error in insert football team tournament performance: %v", err)
+		}
+	case "UpdateFootballTeamTournamentPerformance":
+		if len(keyParts) != 4 {
+			return fmt.Errorf("received bad key message for ifttp")
+		}
+		seasonID, err := strconv.Atoi(keyParts[1])
+		if err != nil {
+			return fmt.Errorf("received bad seasonID in key: %s", keyParts[1])
+		}
+		statID, err := strconv.Atoi(keyParts[3])
+		if err != nil {
+			return fmt.Errorf("received bad statID in key: %s", keyParts[3])
+		}
+
+		var row models.TableRow
+		if err := json.Unmarshal([]byte(valueOfMessage), &row); err != nil {
+			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
+		}
+
+		err = c.db.UpdateFootballTeamTournamentPerformance(ctx, &row, uint32(seasonID), uint32(statID))
+		if err != nil {
+			return fmt.Errorf("error in update football team tournament performance: %v", err)
 		}
 
 	default:

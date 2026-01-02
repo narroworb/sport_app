@@ -645,7 +645,7 @@ func (c *ClichouseDB) nextFootballTeamTournamentPerformanceID() uint32 {
 	return atomic.AddUint32(&c.maxID.teamPerformance, 1)
 }
 
-func (c *ClichouseDB) InsertFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error {
+func (c *ClichouseDB) InsertFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error {
 	id := c.nextFootballTeamTournamentPerformanceID()
 	err := c.conn.Exec(ctx,
 		`INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)
@@ -657,7 +657,7 @@ func (c *ClichouseDB) InsertFootballTeamTournamentPerformanceID(ctx context.Cont
 	return nil
 }
 
-func (c *ClichouseDB) UpdateFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error {
+func (c *ClichouseDB) UpdateFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error {
 	err := c.conn.Exec(ctx,
 		`INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,

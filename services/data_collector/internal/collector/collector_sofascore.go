@@ -39,8 +39,8 @@ type DatabaseInterface interface {
 	GetFootballPlayedMatchID(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetCountPlayersStatsByMatchID(ctx context.Context, matchID uint32) (uint64, error)
 	GetFootballTeamTournamentPerformanceID(ctx context.Context, tournamentID uint32, teamID uint32) (uint32, error)
-	InsertFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error
-	UpdateFootballTeamTournamentPerformanceID(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error
+	InsertFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error
+	UpdateFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error
 	GetUpcomingTours(ctx context.Context) ([]UnactualTournamentsAndTours, error)
 }
 
@@ -205,12 +205,20 @@ func (u *Updater) StartUpdate() {
 				season.Teams[row.Team.Name] = team
 
 				if id, err := u.db.GetFootballTeamTournamentPerformanceID(ctx, seasonID, row.Team.ID); err != nil {
-					if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
-						fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
+					// 	fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// }
+
+					if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballTeamTournamentPerformance|%d|%d", seasonID, row.Team.ID), row); err != nil {
+						log.Printf("error in sending inserting football team performance: %v\n", err)
 					}
 				} else {
-					if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
-						fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
+					// 	fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// }
+
+					if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballTeamTournamentPerformance|%d|%d|%d", seasonID, row.Team.ID, id), row); err != nil {
+						log.Printf("error in sending updating football team performance: %v\n", err)
 					}
 				}
 			}
@@ -391,12 +399,20 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 				season.Teams[row.Team.Name] = team
 
 				if id, err := u.db.GetFootballTeamTournamentPerformanceID(ctx, seasonID, row.Team.ID); err != nil {
-					if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
-						fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
+					// 	fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// }
+
+					if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballTeamTournamentPerformance|%d|%d", seasonID, row.Team.ID), row); err != nil {
+						log.Printf("error in sending inserting football team performance: %v\n", err)
 					}
 				} else {
-					if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
-						fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
+					// 	fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
+					// }
+
+					if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballTeamTournamentPerformance|%d|%d|%d", seasonID, row.Team.ID, id), row); err != nil {
+						log.Printf("error in sending updating football team performance: %v\n", err)
 					}
 				}
 			}

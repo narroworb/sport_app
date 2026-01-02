@@ -65,7 +65,6 @@ type ApiClient struct {
 
 func newApiClient() *ApiClient {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		// chromedp.ExecPath("/usr/bin/chromium"),
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.Flag("headless", true),
@@ -133,13 +132,8 @@ func (u *Updater) StartUpdate() {
 	for i := 0; i < maxWorkers; i++ {
 		go func() {
 			workerCtx, _ := chromedp.NewContext(u.api.(*ApiClient).browserCtx)
-
-			// fmt.Println(u.api.FindManagersOfMatch(workerCtx, "https://www.sofascore.com/football/match/sc-heerenveen-az-alkmaar/ajbsojb#id:14053614"))
-
 			for task := range tasks {
-				// ctx, cancel := context.WithTimeout(workerCtx, 40*time.Second)
 				task(workerCtx)
-				// cancel()
 				wg.Done()
 			}
 		}()
@@ -185,8 +179,6 @@ func (u *Updater) StartUpdate() {
 			}
 
 			for _, row := range r.Standings[0].Rows {
-				// log.Printf("Start to fetch team %s\n", row.Team.Name)
-
 				teamID, err := u.db.GetFootballTeamID(ctx, row.Team.Name)
 				if err != nil {
 					log.Printf("error in get team %s from db: %v\n", row.Team.Name, err)
@@ -373,8 +365,6 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 			}
 
 			for _, row := range r.Standings[0].Rows {
-				// log.Printf("Start to fetch team %s\n", row.Team.Name)
-
 				teamID, err := u.db.GetFootballTeamID(ctx, row.Team.Name)
 				if err != nil {
 					log.Printf("error in get team %s from db: %v\n", row.Team.Name, err)
@@ -610,9 +600,6 @@ func (a *ApiClient) FindManagersOfMatch(ctx context.Context, url string) (homeID
 	ctxTimeout, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
-	// ctx, cancel = chromedp.NewContext(ctxTimeout)
-	// defer cancel()
-
 	var htmls []string
 
 	js := `Array.from(document.querySelectorAll('img[src*="manager"]')).map(el => el.outerHTML)`
@@ -664,8 +651,6 @@ func (u *Updater) fetchManager(ctx context.Context, managerID string) (manager m
 	if err = json.Unmarshal([]byte(body), &result); err != nil {
 		return
 	}
-
-	// fmt.Printf("%+v", result)
 
 	manager = models.Manager{
 		FirstName: strings.Split(result.Manager.Name, " ")[0],
@@ -1128,7 +1113,6 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						continue
 					}
 					keeper := incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper
-					// id := db.GetPlayerByName(strings.TrimSpace(incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper.Name)).ID
 					id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(keeper.Name), time.Unix(keeper.DateOfBirthTimeStamp, 0))
 					if err != nil {
 						log.Printf("error in search in incidents home goal: %v, url: %s, incident: %+v\n", err, url, incident)
@@ -1153,7 +1137,6 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						continue
 					}
 					keeper := incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper
-					// id := db.GetPlayerByName(strings.TrimSpace(incident.FootballPassingNetworkAction[len(incident.FootballPassingNetworkAction)-1].Goalkeeper.Name)).ID
 					id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(keeper.Name), time.Unix(keeper.DateOfBirthTimeStamp, 0))
 					if err != nil {
 						log.Printf("error in search in incidents away goal: %v, url: %s, incident: %+v\n", err, url, incident)
@@ -1201,7 +1184,6 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						log.Printf("error in sending in yellow manager: %v\n", err)
 						continue
 					}
-					// u.db.IncrementYellowCardsManager(ctx, id)
 					break
 				}
 				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), time.Unix(incident.Player.DateOfBirthTimeStamp, 0))
@@ -1245,12 +1227,10 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						log.Printf("error in sending yellow in yellowred manager: %v\n", err)
 						continue
 					}
-					// u.db.IncrementYellowCardsManager(ctx, id)
 					if err := u.producer.Send(ctx, "IncrementRedCardsManager|"+fmt.Sprint(id), struct{}{}); err != nil {
 						log.Printf("error in sending red in yellowred manager: %v\n", err)
 						continue
 					}
-					// u.db.IncrementRedCardsManager(ctx, id)
 					break
 				}
 				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), time.Unix(incident.Player.DateOfBirthTimeStamp, 0))
@@ -1298,7 +1278,6 @@ func (u *Updater) iResponseToPS(ctx context.Context, incidents IncidentsResponse
 						log.Printf("error in sending in red manager: %v\n", err)
 						continue
 					}
-					// u.db.IncrementRedCardsManager(ctx, id)
 					break
 				}
 				id, err := u.db.GetFootballPlayerID(ctx, strings.TrimSpace(incident.Player.Name), time.Unix(incident.Player.DateOfBirthTimeStamp, 0))
@@ -1391,43 +1370,22 @@ type PlayerResponse struct {
 
 func (u *Updater) addStatsToDB(ctx context.Context, statsFromMatch StatsFromMatch, matchID uint32) {
 	if id, err := u.db.GetFootballMatchStats(ctx, statsFromMatch.teamStats, matchID); err != nil || id == 0 {
-		// _, err := u.db.InsertFootballMatchStats(ctx, statsFromMatch.teamStats, matchID)
-		// if err != nil {
-		// 	log.Printf("error in inserting team stats: %v\n", err)
-		// }
-
 		if err := u.producer.Send(ctx, "InsertFootballMatchStats|"+fmt.Sprint(matchID), statsFromMatch.teamStats); err != nil {
 			log.Printf("error in sending team stats: %v\n", err)
 		}
 	}
 
-	// if err := u.db.InsertFootballGoalieMatchStatsBatch(ctx, statsFromMatch.goalieStatsAway, matchID); err != nil {
-	// 	log.Printf("error in inserting away goalie stats: %v\n", err)
-	// }
-
 	if err := u.producer.Send(ctx, "InsertFootballGoalieMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.goalieStatsAway); err != nil {
 		log.Printf("error in sending away goalie stats: %v\n", err)
 	}
-
-	// if err := u.db.InsertFootballGoalieMatchStatsBatch(ctx, statsFromMatch.goalieStatsHome, matchID); err != nil {
-	// 	log.Printf("error in inserting home goalie stats: %v\n", err)
-	// }
 
 	if err := u.producer.Send(ctx, "InsertFootballGoalieMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.goalieStatsHome); err != nil {
 		log.Printf("error in sending home goalie stats: %v\n", err)
 	}
 
-	// if err := u.db.InsertFootballPlayerMatchStatsBatch(ctx, statsFromMatch.playersStatsAway, matchID); err != nil {
-	// 	log.Printf("error in inserting away player stats: %v\n", err)
-	// }
-
 	if err := u.producer.Send(ctx, "InsertFootballPlayerMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.playersStatsAway); err != nil {
 		log.Printf("error in sending away player stats: %v\n", err)
 	}
-
-	// if err := u.db.InsertFootballPlayerMatchStatsBatch(ctx, statsFromMatch.playersStatsHome, matchID); err != nil {
-	// 	log.Printf("error in inserting home player stats: %v\n", err)
-	// }
 
 	if err := u.producer.Send(ctx, "InsertFootballPlayerMatchStatsBatch|"+fmt.Sprint(matchID), statsFromMatch.playersStatsHome); err != nil {
 		log.Printf("error in sending home player stats: %v\n", err)

@@ -310,22 +310,6 @@ func (c *ClichouseDB) nextFootballPlayerID() uint32 {
 }
 
 func (c *ClichouseDB) IncrementYellowCardsManager(ctx context.Context, managerID uint32) error {
-	// row := c.conn.QueryRow(ctx,
-	// 	`SELECT yellow_cards FROM Managers
-	// 	WHERE manager_id=$1`,
-	// 	managerID)
-	// var yellow_cards uint16
-	// if err := row.Scan(&yellow_cards); err != nil {
-	// 	return err
-	// }
-	// yellow_cards++
-	// err := c.conn.Exec(ctx,
-	// 	`ALTER TABLE Managers UPDATE yellow_cards=$1 WHERE manager_id=$2`,
-	// 	yellow_cards, managerID)
-	// if err != nil {
-	// 	return err
-	// }
-
 	err := c.conn.Exec(ctx,
 		`ALTER TABLE Managers UPDATE yellow_cards=yellow_cards+1 WHERE manager_id=$1`,
 		managerID)
@@ -337,22 +321,6 @@ func (c *ClichouseDB) IncrementYellowCardsManager(ctx context.Context, managerID
 }
 
 func (c *ClichouseDB) IncrementRedCardsManager(ctx context.Context, managerID uint32) error {
-	// row := c.conn.QueryRow(ctx,
-	// 	`SELECT red_cards FROM Managers
-	// 	WHERE manager_id=$1`,
-	// 	managerID)
-	// var red_cards int
-	// if err := row.Scan(&red_cards); err != nil {
-	// 	return err
-	// }
-	// red_cards++
-	// err := c.conn.Exec(ctx,
-	// 	`ALTER TABLE Managers UPDATE red_cards=$1 WHERE manager_id=$2`,
-	// 	red_cards, managerID)
-	// if err != nil {
-	// 	return err
-	// }
-
 	err := c.conn.Exec(ctx,
 		`ALTER TABLE Managers UPDATE red_cards=red_cards+1 WHERE manager_id=$1`,
 		managerID)

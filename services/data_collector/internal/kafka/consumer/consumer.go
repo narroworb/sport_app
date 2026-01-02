@@ -108,6 +108,7 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 
 		err = c.db.InsertFootballGoalieMatchStatsBatchNotPointer(ctx, stats, uint32(matchID))
 		if err != nil {
+			log.Printf("bad goalie match(id=%d) stats: %v", matchID, stats)
 			return fmt.Errorf("error in inserting goalies stats: %v", err)
 		}
 
@@ -127,6 +128,7 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 
 		err = c.db.InsertFootballPlayerMatchStatsBatchNotPointer(ctx, stats, uint32(matchID))
 		if err != nil {
+			log.Printf("bad players match(id=%d) stats: %v", matchID, stats)
 			return fmt.Errorf("error in inserting players stats: %v", err)
 		}
 
@@ -155,7 +157,7 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 
 		err = c.db.IncrementRedCardsManager(ctx, uint32(managerID))
 		if err != nil {
-			return fmt.Errorf("error in increment yellow cards manager: %v", err)
+			return fmt.Errorf("error in increment red cards manager: %v", err)
 		}
 
 	default:

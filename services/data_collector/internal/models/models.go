@@ -24,7 +24,7 @@ type Season struct {
 }
 
 type TableRow struct {
-	Team          *Team
+	Team          Team
 	Points        uint16
 	Pos           uint8
 	Matches       uint16

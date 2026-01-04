@@ -657,12 +657,70 @@ func (c *ClichouseDB) InsertFootballTeamTournamentPerformance(ctx context.Contex
 	return nil
 }
 
+func (c *ClichouseDB) InsertFootballTeamTournamentPerformanceBatch(ctx context.Context, performanceBatch []models.TableRow, tournamentID uint32) error {
+	if len(performanceBatch) == 0 {
+		return fmt.Errorf("empty batch")
+	}
+
+	batchInsert, err := c.conn.PrepareBatch(ctx, `INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)`)
+	if err != nil {
+		return fmt.Errorf("ошибка при подготовке батча: %v", err)
+	}
+
+	for _, performance := range performanceBatch {
+		if performance.Team.ID < 1 {
+			log.Printf("try inserting team performance with teamID=0. tournamentID: %d, performance: %+v", tournamentID, performance)
+			continue
+		}
+
+		if err := batchInsert.Append(c.nextFootballTeamTournamentPerformanceID(), tournamentID, performance.Team.ID, performance.Points, performance.Pos, performance.Matches, performance.Wins, performance.Draws, performance.Losses, performance.ScoresFor, performance.ScoresAgainst); err != nil {
+			return fmt.Errorf("ошибка при добавлении в батч: %v", err)
+		}
+	}
+
+	if err := batchInsert.Send(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *ClichouseDB) UpdateFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error {
 	err := c.conn.Exec(ctx,
 		`INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		statID, tournamentID, rowTable.Team.ID, rowTable.Points, rowTable.Pos, rowTable.Matches, rowTable.Wins, rowTable.Draws, rowTable.Losses, rowTable.ScoresFor, rowTable.ScoresAgainst)
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) UpdateFootballTeamTournamentPerformanceBatch(ctx context.Context, performanceBatch map[uint32]models.TableRow, tournamentID uint32) error {
+	if len(performanceBatch) == 0 {
+		return fmt.Errorf("empty batch")
+	}
+
+	batchInsert, err := c.conn.PrepareBatch(ctx, `INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)`)
+	if err != nil {
+		return fmt.Errorf("ошибка при подготовке батча: %v", err)
+	}
+
+	for performanceID, performance := range performanceBatch {
+		if performance.Team.ID < 1 {
+			log.Printf("try updating team performance with teamID=0. tournamentID: %d, performance: %+v", tournamentID, performance)
+			continue
+		}
+		if performanceID < 1 {
+			log.Printf("try updating team performance with performanceID=0. tournamentID: %d, performance: %+v", tournamentID, performance)
+			continue
+		}
+
+		if err := batchInsert.Append(performanceID, tournamentID, performance.Team.ID, performance.Points, performance.Pos, performance.Matches, performance.Wins, performance.Draws, performance.Losses, performance.ScoresFor, performance.ScoresAgainst); err != nil {
+			return fmt.Errorf("ошибка при добавлении в батч: %v", err)
+		}
+	}
+
+	if err := batchInsert.Send(); err != nil {
 		return err
 	}
 	return nil

@@ -178,6 +178,9 @@ func (u *Updater) StartUpdate() {
 				log.Printf("Season %s %s is currently in DB with ID %d\n", tournamentToUpdateInfo.leagueName, tournamentToUpdateInfo.season, seasonID)
 			}
 
+			performancesToUpdate := make(map[uint32]models.TableRow, len(r.Standings[0].Rows))
+			performancesToInsert := make([]models.TableRow, 0, len(r.Standings[0].Rows))
+
 			for _, row := range r.Standings[0].Rows {
 				teamID, err := u.db.GetFootballTeamID(ctx, row.Team.Name)
 				if err != nil {
@@ -185,7 +188,7 @@ func (u *Updater) StartUpdate() {
 					return
 				}
 
-				team := &models.Team{
+				team := models.Team{
 					Name: row.Team.Name,
 					ID:   teamID,
 				}
@@ -202,24 +205,24 @@ func (u *Updater) StartUpdate() {
 					ScoresAgainst: row.ScoresAgainst,
 				}
 				season.Table[row.Pos] = row
-				season.Teams[row.Team.Name] = team
+				season.Teams[row.Team.Name] = &team
 
 				if id, err := u.db.GetFootballTeamTournamentPerformanceID(ctx, seasonID, row.Team.ID); err != nil {
-					// if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
-					// 	fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
-					// }
-
-					if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballTeamTournamentPerformance|%d|%d", seasonID, row.Team.ID), row); err != nil {
-						log.Printf("error in sending inserting football team performance: %v\n", err)
-					}
+					performancesToInsert = append(performancesToInsert, row)
 				} else {
-					// if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
-					// 	fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
-					// }
+					performancesToUpdate[id] = row
+				}
+			}
 
-					if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballTeamTournamentPerformance|%d|%d|%d", seasonID, row.Team.ID, id), row); err != nil {
-						log.Printf("error in sending updating football team performance: %v\n", err)
-					}
+			if len(performancesToInsert) > 0 {
+				if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballTeamTournamentPerformanceBatch|%d", seasonID), performancesToInsert); err != nil {
+					log.Printf("error in sending inserting football team performance batch: %v\n", err)
+				}
+			}
+
+			if len(performancesToUpdate) > 0 {
+				if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballTeamTournamentPerformanceBatch|%d", seasonID), performancesToUpdate); err != nil {
+					log.Printf("error in sending updating football team performance batch: %v\n", err)
 				}
 			}
 
@@ -372,6 +375,9 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 				log.Printf("Season %s %s is currently in DB with ID %d\n", tournamentToUpdateInfo.leagueName, tournamentToUpdateInfo.season, seasonID)
 			}
 
+			performancesToUpdate := make(map[uint32]models.TableRow, len(r.Standings[0].Rows))
+			performancesToInsert := make([]models.TableRow, 0, len(r.Standings[0].Rows))
+
 			for _, row := range r.Standings[0].Rows {
 				teamID, err := u.db.GetFootballTeamID(ctx, row.Team.Name)
 				if err != nil {
@@ -379,7 +385,7 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 					return
 				}
 
-				team := &models.Team{
+				team := models.Team{
 					Name: row.Team.Name,
 					ID:   teamID,
 				}
@@ -396,24 +402,24 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 					ScoresAgainst: row.ScoresAgainst,
 				}
 				season.Table[row.Pos] = row
-				season.Teams[row.Team.Name] = team
+				season.Teams[row.Team.Name] = &team
 
 				if id, err := u.db.GetFootballTeamTournamentPerformanceID(ctx, seasonID, row.Team.ID); err != nil {
-					// if err := u.db.InsertFootballTeamTournamentPerformanceID(ctx, &row, seasonID); err != nil {
-					// 	fmt.Printf("error in insert new team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
-					// }
-
-					if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballTeamTournamentPerformance|%d|%d", seasonID, row.Team.ID), row); err != nil {
-						log.Printf("error in sending inserting football team performance: %v\n", err)
-					}
+					performancesToInsert = append(performancesToInsert, row)
 				} else {
-					// if err := u.db.UpdateFootballTeamTournamentPerformanceID(ctx, &row, seasonID, id); err != nil {
-					// 	fmt.Printf("error in update team(id=%d) tournament(id=%d) performance: %v", row.Team.ID, seasonID, err)
-					// }
+					performancesToUpdate[id] = row
+				}
+			}
 
-					if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballTeamTournamentPerformance|%d|%d|%d", seasonID, row.Team.ID, id), row); err != nil {
-						log.Printf("error in sending updating football team performance: %v\n", err)
-					}
+			if len(performancesToInsert) > 0 {
+				if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballTeamTournamentPerformanceBatch|%d", seasonID), performancesToInsert); err != nil {
+					log.Printf("error in sending inserting football team performance batch: %v\n", err)
+				}
+			}
+
+			if len(performancesToUpdate) > 0 {
+				if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballTeamTournamentPerformanceBatch|%d", seasonID), performancesToUpdate); err != nil {
+					log.Printf("error in sending updating football team performance batch: %v\n", err)
 				}
 			}
 

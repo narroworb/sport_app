@@ -165,3 +165,18 @@ func (m *MockDB) GetUpcomingTours(ctx context.Context) ([]UnactualTournamentsAnd
 	args := m.Called(ctx)
 	return args.Get(0).([]UnactualTournamentsAndTours), args.Error(1)
 }
+
+func (m *MockDB) NextFootballManagerID() uint32 {
+	args := m.Called()
+	return args.Get(0).(uint32)
+}
+
+func (m *MockDB) NextFootballPlayerID() uint32 {
+	args := m.Called()
+	return args.Get(0).(uint32)
+}
+
+func (m *MockDB) NextFootballMatchID() uint32 {
+	args := m.Called()
+	return args.Get(0).(uint32)
+}

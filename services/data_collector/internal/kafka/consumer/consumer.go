@@ -25,6 +25,10 @@ type DatabaseInterface interface {
 	UpdateFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error
 	InsertFootballTeamTournamentPerformanceBatch(ctx context.Context, performanceBatch []models.TableRow, tournamentID uint32) error
 	UpdateFootballTeamTournamentPerformanceBatch(ctx context.Context, performanceBatch map[uint32]models.TableRow, tournamentID uint32) error
+	InsertFootballManagerWithID(ctx context.Context, manager *models.Manager) error
+	UpdateFootballMatch(ctx context.Context, match *models.Match) error
+	InsertFootballMatchWithID(ctx context.Context, match *models.Match, tournamentID uint32) error
+	InsertFootballPlayerWithID(ctx context.Context, player *models.Player) error
 }
 
 type KafkaConsumer struct {
@@ -112,7 +116,7 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 
 		err = c.db.InsertFootballGoalieMatchStatsBatchNotPointer(ctx, stats, uint32(matchID))
 		if err != nil {
-			log.Printf("bad goalie match(id=%d) stats: %v", matchID, stats)
+			log.Printf("bad goalie match(id=%d) stats: %v\n", matchID, stats)
 			return fmt.Errorf("error in inserting goalies stats: %v", err)
 		}
 
@@ -132,7 +136,7 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 
 		err = c.db.InsertFootballPlayerMatchStatsBatchNotPointer(ctx, stats, uint32(matchID))
 		if err != nil {
-			log.Printf("bad players match(id=%d) stats: %v", matchID, stats)
+			log.Printf("bad players match(id=%d) stats: %v\n", matchID, stats)
 			return fmt.Errorf("error in inserting players stats: %v", err)
 		}
 
@@ -162,46 +166,6 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 		err = c.db.IncrementRedCardsManager(ctx, uint32(managerID))
 		if err != nil {
 			return fmt.Errorf("error in increment red cards manager: %v", err)
-		}
-	case "InsertFootballTeamTournamentPerformance":
-		if len(keyParts) != 3 {
-			return fmt.Errorf("received bad key message for ifttp")
-		}
-		seasonID, err := strconv.Atoi(keyParts[1])
-		if err != nil {
-			return fmt.Errorf("received bad seasonID in key: %s", keyParts[1])
-		}
-
-		var row models.TableRow
-		if err := json.Unmarshal([]byte(valueOfMessage), &row); err != nil {
-			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
-		}
-
-		err = c.db.InsertFootballTeamTournamentPerformance(ctx, &row, uint32(seasonID))
-		if err != nil {
-			return fmt.Errorf("error in insert football team tournament performance: %v", err)
-		}
-	case "UpdateFootballTeamTournamentPerformance":
-		if len(keyParts) != 4 {
-			return fmt.Errorf("received bad key message for ufttp")
-		}
-		seasonID, err := strconv.Atoi(keyParts[1])
-		if err != nil {
-			return fmt.Errorf("received bad seasonID in key: %s", keyParts[1])
-		}
-		statID, err := strconv.Atoi(keyParts[3])
-		if err != nil {
-			return fmt.Errorf("received bad statID in key: %s", keyParts[3])
-		}
-
-		var row models.TableRow
-		if err := json.Unmarshal([]byte(valueOfMessage), &row); err != nil {
-			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
-		}
-
-		err = c.db.UpdateFootballTeamTournamentPerformance(ctx, &row, uint32(seasonID), uint32(statID))
-		if err != nil {
-			return fmt.Errorf("error in update football team tournament performance: %v", err)
 		}
 	case "UpdateFootballTeamTournamentPerformanceBatch":
 		if len(keyParts) != 2 {
@@ -239,6 +203,79 @@ func (c *KafkaConsumer) processMessage(ctx context.Context, keyParts []string, v
 		if err != nil {
 			return fmt.Errorf("error in insert football team tournament performance batch: %v", err)
 		}
+	case "InsertFootballManager":
+		var manager models.Manager
+		if err := json.Unmarshal([]byte(valueOfMessage), &manager); err != nil {
+			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
+		}
+
+		if len(keyParts) != 2 {
+			return fmt.Errorf("received bad key message for infmanager")
+		}
+		managerID, err := strconv.Atoi(keyParts[1])
+		if err != nil || managerID != int(manager.ID) {
+			return fmt.Errorf("received bad managerID in key: %s", keyParts[1])
+		}
+
+		err = c.db.InsertFootballManagerWithID(ctx, &manager)
+		if err != nil {
+			return fmt.Errorf("error in inserting manager: %v", err)
+		}
+	case "UpdateFootballMatch":
+		var match models.Match
+		if err := json.Unmarshal([]byte(valueOfMessage), &match); err != nil {
+			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
+		}
+
+		if len(keyParts) != 2 {
+			return fmt.Errorf("received bad key message for upfmatch")
+		}
+		matchID, err := strconv.Atoi(keyParts[1])
+		if err != nil || matchID != int(match.IDAppDB) {
+			return fmt.Errorf("received bad matchID in key: %s", keyParts[1])
+		}
+
+		err = c.db.UpdateFootballMatch(ctx, &match)
+		if err != nil {
+			return fmt.Errorf("error in updating match: %v", err)
+		}
+	case "InsertFootballMatch":
+		var match models.Match
+		if err := json.Unmarshal([]byte(valueOfMessage), &match); err != nil {
+			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
+		}
+
+		if len(keyParts) != 3 {
+			return fmt.Errorf("received bad key message for infmatch")
+		}
+		seasonID, err := strconv.Atoi(keyParts[2])
+		if err != nil {
+			return fmt.Errorf("received bad seasonID in key: %s", keyParts[2])
+		}
+
+		err = c.db.InsertFootballMatchWithID(ctx, &match, uint32(seasonID))
+		if err != nil {
+			return fmt.Errorf("error in inserting match: %v", err)
+		}
+	case "InsertFootballPlayer":
+		var player models.Player
+		if err := json.Unmarshal([]byte(valueOfMessage), &player); err != nil {
+			return fmt.Errorf("cannot unmarshal bad value message: %v", err)
+		}
+
+		if len(keyParts) != 2 {
+			return fmt.Errorf("received bad key message for infplayer")
+		}
+		playerID, err := strconv.Atoi(keyParts[1])
+		if err != nil || playerID != int(player.ID) {
+			return fmt.Errorf("received bad playerID in key: %s", keyParts[1])
+		}
+
+		err = c.db.InsertFootballPlayerWithID(ctx, &player)
+		if err != nil {
+			return fmt.Errorf("error in inserting player: %v", err)
+		}
+
 	default:
 		return fmt.Errorf("undefined operation in kafka message: %v", keyParts[0])
 	}

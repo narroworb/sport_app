@@ -92,7 +92,7 @@ func (c *ClichouseDB) Close() {
 }
 
 func (c *ClichouseDB) GetUnactualTournamentsAndTours(ctx context.Context) ([]collector.UnactualTournamentsAndTours, error) {
-	rows, err := c.conn.Query(ctx, "SELECT DISTINCT t.name, t.season, m.round FROM Tournaments t INNER JOIN Matches m ON t.tournament_id=m.tournament_id WHERE m.status='Not started' AND date < NOW() - INTERVAL 3 HOURS ORDER BY t.name, t.season, m.round;")
+	rows, err := c.conn.Query(ctx, "SELECT DISTINCT  t.name, t.season, round FROM (SELECT DISTINCT m.*, COUNT(s.match_id) OVER (PARTITION BY m.match_id) as stats_count FROM Matches AS m LEFT JOIN Football_Player_Match_Stats AS s ON m.match_id = s.match_id WHERE status = 'Ended') s INNER JOIN Tournaments t ON t.tournament_id=s.tournament_id WHERE stats_count<20 AND season = (SELECT MAX(season) FROM Tournaments) ORDER BY season, tournament_id, round;")
 	if err != nil {
 		return nil, fmt.Errorf("error in query to db: %+v", err)
 	}
@@ -160,7 +160,7 @@ func (c *ClichouseDB) GetFootballManagerID(ctx context.Context, manager *models.
 }
 
 func (c *ClichouseDB) InsertFootballManager(ctx context.Context, manager *models.Manager) (uint32, error) {
-	id := c.nextFootballManagerID()
+	id := c.NextFootballManagerID()
 	err := c.conn.Exec(ctx,
 		`INSERT INTO Managers (manager_id, first_name, last_name, nation, yellow_cards, red_cards)
 		VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -172,7 +172,18 @@ func (c *ClichouseDB) InsertFootballManager(ctx context.Context, manager *models
 	return id, nil
 }
 
-func (c *ClichouseDB) nextFootballManagerID() uint32 {
+func (c *ClichouseDB) InsertFootballManagerWithID(ctx context.Context, manager *models.Manager) error {
+	err := c.conn.Exec(ctx,
+		`INSERT INTO Managers (manager_id, first_name, last_name, nation, yellow_cards, red_cards)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		manager.ID, manager.FirstName, manager.LastName, manager.Nation, manager.YellowCards, manager.RedCards)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) NextFootballManagerID() uint32 {
 	return atomic.AddUint32(&c.maxID.manager, 1)
 }
 
@@ -238,7 +249,7 @@ func (c *ClichouseDB) UpdateFootballMatch(ctx context.Context, match *models.Mat
 }
 
 func (c *ClichouseDB) InsertFootballMatch(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error) {
-	id := c.nextFootballMatchID()
+	id := c.NextFootballMatchID()
 
 	err := c.conn.Exec(ctx,
 		`INSERT INTO Matches (match_id, tournament_id, date, home_team_id, away_team_id, home_score, away_score, round, home_team_manager_id, away_team_manager_id, status)
@@ -251,7 +262,18 @@ func (c *ClichouseDB) InsertFootballMatch(ctx context.Context, match *models.Mat
 	return id, nil
 }
 
-func (c *ClichouseDB) nextFootballMatchID() uint32 {
+func (c *ClichouseDB) InsertFootballMatchWithID(ctx context.Context, match *models.Match, tournamentID uint32) error {
+	err := c.conn.Exec(ctx,
+		`INSERT INTO Matches (match_id, tournament_id, date, home_team_id, away_team_id, home_score, away_score, round, home_team_manager_id, away_team_manager_id, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		match.IDAppDB, tournamentID, match.Date, match.HomeTeam.ID, match.AwayTeam.ID, match.HomeGoals, match.AwayGoals, match.Round, match.HomeManager.ID, match.AwayManager.ID, match.Status)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) NextFootballMatchID() uint32 {
 	return atomic.AddUint32(&c.maxID.match, 1)
 }
 
@@ -292,7 +314,7 @@ func (c *ClichouseDB) GetFootballPlayerID(ctx context.Context, name string, date
 }
 
 func (c *ClichouseDB) InsertFootballPlayer(ctx context.Context, player *models.Player) (uint32, error) {
-	id := c.nextFootballPlayerID()
+	id := c.NextFootballPlayerID()
 
 	err := c.conn.Exec(ctx,
 		`INSERT INTO Athletes (athlete_id, sport_id, first_name, last_name, position, date_of_birth, height, preferred_foot_or_handness, nation, current_status)
@@ -305,7 +327,18 @@ func (c *ClichouseDB) InsertFootballPlayer(ctx context.Context, player *models.P
 	return id, nil
 }
 
-func (c *ClichouseDB) nextFootballPlayerID() uint32 {
+func (c *ClichouseDB) InsertFootballPlayerWithID(ctx context.Context, player *models.Player) error {
+	err := c.conn.Exec(ctx,
+		`INSERT INTO Athletes (athlete_id, sport_id, first_name, last_name, position, date_of_birth, height, preferred_foot_or_handness, nation, current_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		player.ID, 1, player.FirstName, player.LastName, player.Position, player.DateOfBirth, player.Height, player.PreferredFoot, player.Nation, player.CurrentStatus)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *ClichouseDB) NextFootballPlayerID() uint32 {
 	return atomic.AddUint32(&c.maxID.athlete, 1)
 }
 

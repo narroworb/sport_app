@@ -17,31 +17,21 @@ type DatabaseInterface interface {
 	GetUnactualTournamentsAndTours(context.Context) ([]UnactualTournamentsAndTours, error)
 	GetFootballTournamentID(ctx context.Context, name, season string) (uint32, error)
 	GetFootballTeamID(ctx context.Context, name string) (uint32, error)
-	InsertFootballManager(ctx context.Context, manager *models.Manager) (uint32, error)
 	GetFootballManagerID(ctx context.Context, manager *models.Manager) (uint32, error)
 	GetFootballMatchID(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetFootballMatchStatus(ctx context.Context, matchID uint32) (string, error)
-	UpdateFootballMatch(ctx context.Context, match *models.Match) error
-	InsertFootballMatch(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetFootballPlayerID(ctx context.Context, name string, dateOfBirth time.Time) (uint32, error)
-	InsertFootballPlayer(ctx context.Context, player *models.Player) (uint32, error)
-	IncrementYellowCardsManager(ctx context.Context, managerID uint32) error
-	IncrementRedCardsManager(ctx context.Context, managerID uint32) error
-	InsertFootballMatchStats(ctx context.Context, stats models.TeamMatchStats, matchID uint32) (uint32, error)
 	GetFootballMatchStats(ctx context.Context, stats models.TeamMatchStats, matchID uint32) (uint32, error)
-	InsertFootballPlayerMatchStats(ctx context.Context, stats models.PlayerStatsInMatch, matchID uint32) (uint32, error)
 	GetFootballPlayerMatchStats(ctx context.Context, stats models.PlayerStatsInMatch, matchID uint32) (uint32, error)
-	InsertFootballGoalieMatchStats(ctx context.Context, stats models.GoalieStatsInMatch, matchID uint32) (uint32, error)
 	GetFootballGoalieMatchStats(ctx context.Context, stats models.GoalieStatsInMatch, matchID uint32) (uint32, error)
-	InsertFootballGoalieMatchStatsBatch(ctx context.Context, statsBatch map[uint32]*models.GoalieStatsInMatch, matchID uint32) error
-	InsertFootballPlayerMatchStatsBatch(ctx context.Context, statsBatch map[uint32]*models.PlayerStatsInMatch, matchID uint32) error
 	GetFootballNotPlayedMatchID(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetFootballPlayedMatchID(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetCountPlayersStatsByMatchID(ctx context.Context, matchID uint32) (uint64, error)
 	GetFootballTeamTournamentPerformanceID(ctx context.Context, tournamentID uint32, teamID uint32) (uint32, error)
-	InsertFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32) error
-	UpdateFootballTeamTournamentPerformance(ctx context.Context, rowTable *models.TableRow, tournamentID uint32, statID uint32) error
 	GetUpcomingTours(ctx context.Context) ([]UnactualTournamentsAndTours, error)
+	NextFootballManagerID() uint32
+	NextFootballPlayerID() uint32
+	NextFootballMatchID() uint32
 }
 
 type SofaApi interface {
@@ -238,6 +228,12 @@ func (u *Updater) StartUpdate() {
 
 				for indMatch, match := range matches {
 					log.Printf("Матч %s - %s от %s в обработке. \n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+
+					if match.Status == "Halftime" || match.Status == "1st half" || match.Status == "2nd half" {
+						log.Printf("Матч %s - %s от %s проходит в данный момент и будет обработан в следующий раз. \n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+						continue
+					}
+
 					if id, err := u.db.GetFootballPlayedMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
 						if cnt, err := u.db.GetCountPlayersStatsByMatchID(ctx, id); err == nil && cnt >= 20 {
 							log.Printf("Матч %s - %s от %s уже в базе и полностью обработан.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
@@ -248,9 +244,8 @@ func (u *Updater) StartUpdate() {
 					} else if id, err := u.db.GetFootballNotPlayedMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
 						log.Printf("Матч %s - %s от %s уже в базе со статусом 'Не сыгран'.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
 						matches[indMatch].IDAppDB = id
-						err := u.db.UpdateFootballMatch(ctx, &(matches[indMatch]))
-						if err != nil {
-							log.Printf("error in updating match %+v: %v\n", matches[indMatch], err)
+						if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballMatch|%d", id), matches[indMatch]); err != nil {
+							log.Printf("error in sending updating football match %+v: %v\n", matches[indMatch], err)
 							continue
 						}
 					} else if id, err := u.db.GetFootballMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
@@ -262,9 +257,8 @@ func (u *Updater) StartUpdate() {
 							continue
 						}
 						if status != matches[indMatch].Status {
-							err := u.db.UpdateFootballMatch(ctx, &(matches[indMatch]))
-							if err != nil {
-								log.Printf("error in updating match %+v: %v\n", matches[indMatch], err)
+							if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballMatch|%d", id), matches[indMatch]); err != nil {
+								log.Printf("error in sending updating football match %+v: %v\n", matches[indMatch], err)
 								continue
 							}
 						} else {
@@ -272,10 +266,10 @@ func (u *Updater) StartUpdate() {
 							continue
 						}
 					} else {
-						id, err := u.db.InsertFootballMatch(ctx, &(matches[indMatch]), seasonID)
+						id := u.db.NextFootballMatchID()
 						matches[indMatch].IDAppDB = id
-						if err != nil {
-							log.Printf("error in insert match: %v\n", err)
+						if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballMatch|%d|%d", id, seasonID), matches[indMatch]); err != nil {
+							log.Printf("error in sending inserting football match %+v: %v\n", matches[indMatch], err)
 							continue
 						}
 					}
@@ -435,15 +429,18 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 
 				for indMatch, match := range matches {
 					log.Printf("Матч %s - %s от %s в обработке. \n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+					if match.Status == "Halftime" || match.Status == "1st half" || match.Status == "2nd half" {
+						log.Printf("Матч %s - %s от %s проходит в данный момент и будет обработан в следующий раз. \n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+						continue
+					}
 					if id, err := u.db.GetFootballPlayedMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
 						log.Printf("Матч %s - %s от %s уже в базе и полностью обработан.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
 						continue
 					} else if id, err := u.db.GetFootballNotPlayedMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
 						log.Printf("Матч %s - %s от %s уже в базе со статусом 'Не сыгран'.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
 						matches[indMatch].IDAppDB = id
-						err := u.db.UpdateFootballMatch(ctx, &(matches[indMatch]))
-						if err != nil {
-							log.Printf("error in updating match %+v: %v\n", matches[indMatch], err)
+						if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballMatch|%d", id), matches[indMatch]); err != nil {
+							log.Printf("error in sending updating football match %+v: %v\n", matches[indMatch], err)
 							continue
 						}
 					} else if id, err := u.db.GetFootballMatchID(ctx, &(matches[indMatch]), seasonID); err == nil && id != 0 {
@@ -455,9 +452,8 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 							continue
 						}
 						if status != matches[indMatch].Status {
-							err := u.db.UpdateFootballMatch(ctx, &(matches[indMatch]))
-							if err != nil {
-								log.Printf("error in updating match %+v: %v\n", matches[indMatch], err)
+							if err := u.producer.Send(ctx, fmt.Sprintf("UpdateFootballMatch|%d", id), matches[indMatch]); err != nil {
+								log.Printf("error in sending updating football match %+v: %v\n", matches[indMatch], err)
 								continue
 							}
 						} else {
@@ -465,10 +461,10 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 							continue
 						}
 					} else {
-						id, err := u.db.InsertFootballMatch(ctx, &(matches[indMatch]), seasonID)
+						id := u.db.NextFootballMatchID()
 						matches[indMatch].IDAppDB = id
-						if err != nil {
-							log.Printf("error in insert match: %v\n", err)
+						if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballMatch|%d|%d", id, seasonID), matches[indMatch]); err != nil {
+							log.Printf("error in sending inserting football match %+v: %v\n", matches[indMatch], err)
 							continue
 						}
 					}
@@ -588,16 +584,16 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 		}
 
 		if id, err := u.db.GetFootballManagerID(ctx, &homeManager); err != nil || id == 0 {
-			_, err := u.db.InsertFootballManager(ctx, &homeManager)
-			if err != nil {
-				log.Printf("error in insert manager: %v\n", err)
+			homeManager.ID = u.db.NextFootballManagerID()
+			if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballManager|%d", homeManager.ID), homeManager); err != nil {
+				log.Printf("error in sending inserting football manager: %v\n", err)
 			}
 		}
 
 		if id, err := u.db.GetFootballManagerID(ctx, &awayManager); err != nil || id == 0 {
-			_, err := u.db.InsertFootballManager(ctx, &awayManager)
-			if err != nil {
-				log.Printf("error in insert manager: %v\n", err)
+			awayManager.ID = u.db.NextFootballManagerID()
+			if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballManager|%d", awayManager.ID), awayManager); err != nil {
+				log.Printf("error in sending inserting football manager: %v\n", err)
 			}
 		}
 
@@ -968,12 +964,13 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 				log.Printf("Ошибка в получении данных игрока %s: %v\n", p.Player.Name, err)
 				continue
 			}
-			_, err = u.db.InsertFootballPlayer(ctx, player)
-			if err != nil {
-				log.Printf("error in inserting player %s: %v\n", p.Player.Name, err)
+			playerID := u.db.NextFootballPlayerID()
+			player.ID = playerID
+			if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballPlayer|%d", playerID), *player); err != nil {
+				log.Printf("error in sending inserting football player %+v: %v\n", *player, err)
 				continue
 			}
-			id = player.ID
+			id = playerID
 		}
 		if p.Player.Position == "G" {
 			stats := &models.GoalieStatsInMatch{
@@ -1045,12 +1042,13 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 				log.Printf("Ошибка в получении данных игрока %s: %v\n", p.Player.Name, err)
 				continue
 			}
-			_, err = u.db.InsertFootballPlayer(ctx, player)
-			if err != nil {
-				log.Printf("error in inserting player %s: %v\n", p.Player.Name, err)
+			playerID := u.db.NextFootballPlayerID()
+			player.ID = playerID
+			if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballPlayer|%d", playerID), *player); err != nil {
+				log.Printf("error in sending inserting football player %+v: %v\n", *player, err)
 				continue
 			}
-			id = player.ID
+			id = playerID
 		}
 		if p.Player.Position == "G" {
 			stats := &models.GoalieStatsInMatch{

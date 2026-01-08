@@ -557,44 +557,50 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 
 	matches := make([]models.Match, 0, len(result.Events))
 	for _, e := range result.Events {
-		url := fmt.Sprintf("https://www.sofascore.com/football/match/%s/%s#id:%d", e.Slug, e.CustomID, e.ID)
-		homeManagerID, awayManagerID := u.api.FindManagersOfMatch(ctx, url)
-		if homeManagerID == "" && awayManagerID == "" {
-			log.Printf("first attempt to find managers of match %s - %s by url=%s is failed\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
-			for attempt := 2; attempt <= 3; attempt++ {
-				time.Sleep(time.Second * 5)
-				homeManagerID, awayManagerID = u.api.FindManagersOfMatch(ctx, url)
-				if homeManagerID != "" || awayManagerID != "" {
-					log.Printf("attempt %d to find managers of match %s - %s by url=%s is success\n", attempt, e.HomeTeam.Name, e.AwayTeam.Name, url)
-					break
+		var homeManager, awayManager models.Manager
+		if e.Status.Description != "Not started" {
+			url := fmt.Sprintf("https://www.sofascore.com/football/match/%s/%s#id:%d", e.Slug, e.CustomID, e.ID)
+			homeManagerID, awayManagerID := u.api.FindManagersOfMatch(ctx, url)
+			if homeManagerID == "" && awayManagerID == "" {
+				log.Printf("first attempt to find managers of match %s - %s by url=%s is failed\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
+				for attempt := 2; attempt <= 3; attempt++ {
+					time.Sleep(time.Second * 5)
+					homeManagerID, awayManagerID = u.api.FindManagersOfMatch(ctx, url)
+					if homeManagerID != "" || awayManagerID != "" {
+						log.Printf("attempt %d to find managers of match %s - %s by url=%s is success\n", attempt, e.HomeTeam.Name, e.AwayTeam.Name, url)
+						break
+					}
+					log.Printf("attempt %d to find managers of match %s - %s by url=%s is failed\n", attempt, e.HomeTeam.Name, e.AwayTeam.Name, url)
 				}
-				log.Printf("attempt %d to find managers of match %s - %s by url=%s is failed\n", attempt, e.HomeTeam.Name, e.AwayTeam.Name, url)
 			}
-		}
-		homeManager, err := u.fetchManager(ctx, homeManagerID)
-		if err != nil || (homeManager.FirstName == "" && homeManager.LastName == "") {
-			log.Printf("Home manager from match %s - %s by url %s not found.\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
-			homeManager = models.Manager{FirstName: "Not", LastName: "Find"}
-		}
-
-		awayManager, err := u.fetchManager(ctx, awayManagerID)
-		if err != nil || (awayManager.FirstName == "" && awayManager.LastName == "") {
-			log.Printf("Away manager from match %s - %s by url %s not found.\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
-			awayManager = models.Manager{FirstName: "Not", LastName: "Find"}
-		}
-
-		if id, err := u.db.GetFootballManagerID(ctx, &homeManager); err != nil || id == 0 {
-			homeManager.ID = u.db.NextFootballManagerID()
-			if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballManager|%d", homeManager.ID), homeManager); err != nil {
-				log.Printf("error in sending inserting football manager: %v\n", err)
+			homeManager, err = u.fetchManager(ctx, homeManagerID)
+			if err != nil || (homeManager.FirstName == "" && homeManager.LastName == "") {
+				log.Printf("Home manager from match %s - %s by url %s not found.\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
+				homeManager = models.Manager{FirstName: "Not", LastName: "Found"}
 			}
-		}
 
-		if id, err := u.db.GetFootballManagerID(ctx, &awayManager); err != nil || id == 0 {
-			awayManager.ID = u.db.NextFootballManagerID()
-			if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballManager|%d", awayManager.ID), awayManager); err != nil {
-				log.Printf("error in sending inserting football manager: %v\n", err)
+			awayManager, err = u.fetchManager(ctx, awayManagerID)
+			if err != nil || (awayManager.FirstName == "" && awayManager.LastName == "") {
+				log.Printf("Away manager from match %s - %s by url %s not found.\n", e.HomeTeam.Name, e.AwayTeam.Name, url)
+				awayManager = models.Manager{FirstName: "Not", LastName: "Found"}
 			}
+
+			if id, err := u.db.GetFootballManagerID(ctx, &homeManager); err != nil || id == 0 {
+				homeManager.ID = u.db.NextFootballManagerID()
+				if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballManager|%d", homeManager.ID), homeManager); err != nil {
+					log.Printf("error in sending inserting football manager: %v\n", err)
+				}
+			}
+
+			if id, err := u.db.GetFootballManagerID(ctx, &awayManager); err != nil || id == 0 {
+				awayManager.ID = u.db.NextFootballManagerID()
+				if err := u.producer.Send(ctx, fmt.Sprintf("InsertFootballManager|%d", awayManager.ID), awayManager); err != nil {
+					log.Printf("error in sending inserting football manager: %v\n", err)
+				}
+			}
+		} else {
+			homeManager = models.Manager{FirstName: "Not", LastName: "Found", ID: 1}
+			awayManager = models.Manager{FirstName: "Not", LastName: "Found", ID: 1}
 		}
 
 		matches = append(matches, models.Match{

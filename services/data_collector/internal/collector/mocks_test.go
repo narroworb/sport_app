@@ -180,3 +180,8 @@ func (m *MockDB) NextFootballMatchID() uint32 {
 	args := m.Called()
 	return args.Get(0).(uint32)
 }
+
+func (m *MockDB) GetMatchesByTournamentAndRound(ctx context.Context, seasonID uint32, round uint16) (map[ShortTypeMatch]ManagersOfMatch, error) {
+	args := m.Called(ctx, seasonID, round)
+	return args.Get(0).(map[ShortTypeMatch]ManagersOfMatch), args.Error(1)
+}

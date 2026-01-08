@@ -32,6 +32,7 @@ type DatabaseInterface interface {
 	NextFootballManagerID() uint32
 	NextFootballPlayerID() uint32
 	NextFootballMatchID() uint32
+	GetMatchesByTournamentAndRound(ctx context.Context, seasonID uint32, round uint16) (map[ShortTypeMatch]ManagersOfMatch, error)
 }
 
 type SofaApi interface {
@@ -219,7 +220,7 @@ func (u *Updater) StartUpdate() {
 			fmt.Println("Обработка туров", tournamentToUpdateInfo.leagueName, season.Year)
 			for _, tour := range tournamentToUpdateInfo.tours {
 				log.Printf("парсинг %d тура лиги %s %s\n", tour, tournamentToUpdateInfo.leagueName, season.Year)
-				matches, err := u.fetchMatches(ctx, tournamentToUpdateInfo.baseURL, tour, season.Teams)
+				matches, err := u.fetchMatches(ctx, tournamentToUpdateInfo.baseURL, tour, season.Teams, seasonID)
 				if err != nil {
 					log.Printf("Ошибка при обработке матчей %d тура лиги %s %s: %v\n", tour, tournamentToUpdateInfo.leagueName, season.Year, err)
 					continue
@@ -420,7 +421,7 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 			fmt.Println("Обработка туров", tournamentToUpdateInfo.leagueName, season.Year)
 			for _, tour := range tournamentToUpdateInfo.tours {
 				log.Printf("парсинг %d тура лиги %s %s\n", tour, tournamentToUpdateInfo.leagueName, season.Year)
-				matches, err := u.fetchMatches(ctx, tournamentToUpdateInfo.baseURL, tour, season.Teams)
+				matches, err := u.fetchMatches(ctx, tournamentToUpdateInfo.baseURL, tour, season.Teams, seasonID)
 				if err != nil {
 					log.Printf("Ошибка при обработке матчей %d тура лиги %s %s: %v\n", tour, tournamentToUpdateInfo.leagueName, season.Year, err)
 					continue
@@ -539,7 +540,7 @@ type MatchesResponse struct {
 	} `json:"events"`
 }
 
-func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uint16, allTeams map[string]*models.Team) ([]models.Match, error) {
+func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uint16, allTeams map[string]*models.Team, seasonID uint32) ([]models.Match, error) {
 	url := fmt.Sprintf("%s/events/round/%d", url_base, roundID)
 	body, err := u.api.FetchBodyConc(ctx, url)
 	if err != nil {
@@ -555,8 +556,36 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 		return nil, err
 	}
 
+	matchesInDB, err := u.db.GetMatchesByTournamentAndRound(ctx, seasonID, roundID)
+	if err != nil {
+		return nil, err
+	}
+
 	matches := make([]models.Match, 0, len(result.Events))
 	for _, e := range result.Events {
+		shortMatch := ShortTypeMatch{
+			HomeTeamName:  e.HomeTeam.Name,
+			AwayTeamName:  e.AwayTeam.Name,
+			HomeScore:     int16(e.HomeScore.Display),
+			AwayScore:     int16(e.AwayScore.Display),
+			DateTimestamp: e.StartTime,
+			Status:        e.Status.Description,
+		}
+
+		if managers, ok := matchesInDB[shortMatch]; ok && managers.HomeTeamManagerID != 1 && managers.AwayTeamManagerID != 1 {
+			matches = append(matches, models.Match{
+				ID:        e.ID,
+				Date:      time.Unix(e.StartTime, 0).Add(time.Hour * 3),
+				HomeTeam:  allTeams[e.HomeTeam.Name],
+				AwayTeam:  allTeams[e.AwayTeam.Name],
+				HomeGoals: uint16(e.HomeScore.Display),
+				AwayGoals: uint16(e.AwayScore.Display),
+				Round:     uint16(roundID),
+				Status:    e.Status.Description,
+			})
+			continue
+		}
+
 		var homeManager, awayManager models.Manager
 		if e.Status.Description != "Not started" {
 			url := fmt.Sprintf("https://www.sofascore.com/football/match/%s/%s#id:%d", e.Slug, e.CustomID, e.ID)

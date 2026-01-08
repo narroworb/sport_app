@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/narroworb/data_collector/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +50,10 @@ func TestFetchMatches(t *testing.T) {
 	api.On("FetchBodyConc", mock.Anything, "url/events/round/10").
 		Return(body, nil)
 
-	api.On("FindManagersOfMatch", mock.AnythingOfType("string")).
+	db.On("GetMatchesByTournamentAndRound", mock.Anything, mock.Anything, mock.Anything).
+		Return(map[ShortTypeMatch]ManagersOfMatch{}, nil)
+
+	api.On("FindManagersOfMatch", mock.Anything, mock.AnythingOfType("string")).
 		Return("10", "20")
 
 	api.On("FetchBodyConc", mock.Anything, "https://api.sofascore.com/api/v1/manager/10").
@@ -59,9 +63,6 @@ func TestFetchMatches(t *testing.T) {
 		Return(`xxxxx{"manager":{"name":"Carlos Ruiz","country":{"name":"Mexico"}}}`, nil)
 
 	db.On("GetFootballManagerID", mock.Anything, mock.Anything).
-		Return(uint32(0), nil)
-
-	db.On("InsertFootballManager", mock.Anything, mock.Anything).
 		Return(uint32(1), nil)
 
 	teams := map[string]*models.Team{
@@ -69,7 +70,7 @@ func TestFetchMatches(t *testing.T) {
 		"B": {Name: "B", ID: 2},
 	}
 
-	matches, err := u.fetchMatches(context.Background(), "url", 10, teams)
+	matches, err := u.fetchMatches(context.Background(), "url", 10, teams, 1)
 
 	require.NoError(t, err)
 	require.Len(t, matches, 1)
@@ -107,9 +108,7 @@ func TestFetchAllStatisticsFromMatches(t *testing.T) {
 	api.On("FetchBodyConc", mock.Anything, urlIncidents).
 		Return(incidentsJSON, nil)
 
-	
-
-	db.On("GetFootballPlayerID", mock.Anything, "Pepe Reina", "G", uint16(188)).
+	db.On("GetFootballPlayerID", mock.Anything, "Pepe Reina", time.Unix(399600000, 0)).
 		Return(uint32(26937), nil)
 
 	db.On("GetFootballPlayerID", mock.Anything, mock.Anything, mock.Anything, mock.Anything).

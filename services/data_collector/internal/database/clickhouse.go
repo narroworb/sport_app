@@ -787,3 +787,28 @@ func (c *ClichouseDB) GetUpcomingTours(ctx context.Context) ([]collector.Unactua
 
 	return res, nil
 }
+
+func (c *ClichouseDB) GetMatchesByTournamentAndRound(ctx context.Context, seasonID uint32, round uint16) (map[collector.ShortTypeMatch]collector.ManagersOfMatch, error) {
+	rows, err := c.conn.Query(ctx, "SELECT date, t.name, t2.name, home_score, away_score, home_team_manager_id, away_team_manager_id, status FROM Matches m INNER JOIN Teams t ON m.home_team_id=t.team_id INNER JOIN Teams t2 ON m.away_team_id=t2.team_id WHERE tournament_id=$1 and round=$2 ORDER BY date ASC", seasonID, round)
+	if err != nil {
+		return nil, fmt.Errorf("error in query to db: %+v", err)
+	}
+
+	defer rows.Close()
+	res := make(map[collector.ShortTypeMatch]collector.ManagersOfMatch)
+
+	for rows.Next() {
+		var match collector.ShortTypeMatch
+		var managers collector.ManagersOfMatch
+		var date time.Time
+
+		if err := rows.Scan(&date, &match.HomeTeamName, &match.AwayTeamName, &match.HomeScore, &match.AwayScore, &managers.HomeTeamManagerID, &managers.AwayTeamManagerID, &match.Status); err != nil {
+			return nil, fmt.Errorf("error in scan query: %+v", err)
+		}
+
+		match.DateTimestamp = date.Add(-time.Hour * 3).Unix()
+		res[match] = managers
+	}
+
+	return res, nil
+}

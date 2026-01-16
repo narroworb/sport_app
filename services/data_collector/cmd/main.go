@@ -52,20 +52,22 @@ func main() {
 		}
 	}()
 
-	updater := collector.NewUpdater(db, producer)
+	updaterWithStats := collector.NewUpdater(db, producer)
 	log.Println("Connected to updater")
 
-	schedulerStats := scheduler.NewScheduler(updater.StartUpdate)
+	schedulerStats := scheduler.NewScheduler(updaterWithStats.StartUpdate)
 
 	log.Println("scheduler by stats created")
 
-	go schedulerStats.Start(time.Hour * 1)
+	go schedulerStats.Start(time.Hour * 2)
 
-	schedulerWithoutStats := scheduler.NewScheduler(updater.StartUpdateWithoutStatistics)
+	updaterWithoutStats := collector.NewUpdater(db, producer)
+
+	schedulerWithoutStats := scheduler.NewScheduler(updaterWithoutStats.StartUpdateWithoutStatistics)
 
 	log.Println("scheduler without stats created")
 
-	go schedulerWithoutStats.Start(time.Hour * 2)
+	go schedulerWithoutStats.Start(time.Hour * 1)
 
 	r := chi.NewRouter()
 

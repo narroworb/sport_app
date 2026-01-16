@@ -4,15 +4,15 @@ import "time"
 
 type Match struct {
 	ID          int
-	IDAppDB  uint32
+	IDAppDB     uint32
 	Date        time.Time
-	HomeTeam    *Team
-	AwayTeam    *Team
+	HomeTeam    Team
+	AwayTeam    Team
 	HomeGoals   uint16
 	AwayGoals   uint16
 	Round       uint16
-	HomeManager *Manager
-	AwayManager *Manager
+	HomeManager Manager
+	AwayManager Manager
 	Status      string
 }
 
@@ -29,7 +29,7 @@ type TableRow struct {
 	Pos           uint8
 	Matches       uint16
 	Wins          uint16
-	Losses         uint16
+	Losses        uint16
 	Draws         uint16
 	ScoresFor     uint16
 	ScoresAgainst uint16

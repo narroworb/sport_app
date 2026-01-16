@@ -275,6 +275,11 @@ func (u *Updater) StartUpdate() {
 						}
 					}
 
+					if match.Status != "Ended" && match.Status != "Abandoned" && match.Status != "Canceled" {
+						log.Printf("Матч %s - %s от %s обработан.\n", match.HomeTeam.Name, match.AwayTeam.Name, match.Date)
+						continue
+					}
+
 					s, err := u.fetchAllStatisticsFromMatches(ctx, fmt.Sprint(match.ID))
 					if err != nil {
 						log.Println("Ошибка в обработке статистики матча: ", err)
@@ -576,8 +581,8 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 			matches = append(matches, models.Match{
 				ID:        e.ID,
 				Date:      time.Unix(e.StartTime, 0).Add(time.Hour * 3),
-				HomeTeam:  allTeams[e.HomeTeam.Name],
-				AwayTeam:  allTeams[e.AwayTeam.Name],
+				HomeTeam:  *allTeams[e.HomeTeam.Name],
+				AwayTeam:  *allTeams[e.AwayTeam.Name],
 				HomeGoals: uint16(e.HomeScore.Display),
 				AwayGoals: uint16(e.AwayScore.Display),
 				Round:     uint16(roundID),
@@ -635,13 +640,13 @@ func (u *Updater) fetchMatches(ctx context.Context, url_base string, roundID uin
 		matches = append(matches, models.Match{
 			ID:          e.ID,
 			Date:        time.Unix(e.StartTime, 0).Add(time.Hour * 3),
-			HomeTeam:    allTeams[e.HomeTeam.Name],
-			AwayTeam:    allTeams[e.AwayTeam.Name],
+			HomeTeam:    *allTeams[e.HomeTeam.Name],
+			AwayTeam:    *allTeams[e.AwayTeam.Name],
 			HomeGoals:   uint16(e.HomeScore.Display),
 			AwayGoals:   uint16(e.AwayScore.Display),
 			Round:       uint16(roundID),
-			HomeManager: &homeManager,
-			AwayManager: &awayManager,
+			HomeManager: homeManager,
+			AwayManager: awayManager,
 			Status:      e.Status.Description,
 		})
 	}

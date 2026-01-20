@@ -17,6 +17,7 @@ services:
   auth_service:
     build: .
     container_name: auth_service
+    restart: always
     depends_on:
       - postgres
     ports:

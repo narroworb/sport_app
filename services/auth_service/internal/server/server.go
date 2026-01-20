@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log"
 	"net/http"
 	"os"
 
@@ -27,5 +28,8 @@ func Run() {
 	r.Post("/login", handler.Login)
 	r.Get("/me", handler.Me)
 
-	http.ListenAndServe(":"+port, r)
+	log.Println("server started!")
+	if err := http.ListenAndServe(":"+port, r); err != nil {
+		log.Fatalf("error in wrok server: %v", err)
+	}
 }

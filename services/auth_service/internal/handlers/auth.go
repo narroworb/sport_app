@@ -29,7 +29,6 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 
 	_, err := h.DB.Exec(`INSERT INTO users (username, password_hash) VALUES($1, $2);`, req.Username, hash)
-
 	if err != nil {
 		http.Error(w, "username already exists", http.StatusConflict)
 		return
@@ -66,7 +65,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, _ := jwt.GenerateToken(user.Username)
+	token, _ := jwt.GenerateToken(user.Username, user.ID)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
@@ -81,13 +80,14 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username, err := jwt.ParseToken(authHeader)
+	username, userID, err := jwt.ParseToken(authHeader)
 	if err != nil {
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]any{
 		"username": username,
+		"id":       userID,
 	})
 }

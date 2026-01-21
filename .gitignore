@@ -6,3 +6,5 @@ clickhouse_data_backup.tar.gz
 /internal/database/clickhouse-data
 /internal/database/logs
 *.out
+**/.env
+**/.env.*

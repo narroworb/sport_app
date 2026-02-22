@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    networks:
+      - data_collector_default
+    ports:
+      - "6379:6379"
+
+  core_api:
+    build: .
+    container_name: core_api
+    restart: always
+    networks:
+      - data_collector_default
+    depends_on:
+      - redis
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    command: ["./core_api"]
+
+networks:
+  data_collector_default:
+    external: true
+    name: data_collector_default

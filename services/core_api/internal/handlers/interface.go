@@ -7,7 +7,7 @@ import (
 	"github.com/narroworb/core_api/internal/models"
 )
 
-type DatabaseInterface interface {
+type AnalyticDatabaseInterface interface {
 	GetPlayerByID(ctx context.Context, id uint32) (models.Player, error)
 	GetManagerByID(ctx context.Context, id uint32) (models.Manager, error)
 	GetTeamByID(ctx context.Context, id uint32) (models.Team, error)
@@ -51,4 +51,16 @@ type DatabaseInterface interface {
 type CacheInterface interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+}
+
+type TransactionDatabaseInterface interface {
+	GetFavoritePlayersIDs(ctx context.Context, userID int64) ([]uint32, error)
+	GetFavoriteManagersIDs(ctx context.Context, userID int64) ([]uint32, error)
+	GetFavoriteTeamsIDs(ctx context.Context, userID int64) ([]uint32, error)
+	GetFavoriteTournamentIDs(ctx context.Context, userID int64) ([]uint32, error)
+
+	SetFavoritePlayerByID(ctx context.Context, userID int64, playerID int64) error
+	SetFavoriteManagerByID(ctx context.Context, userID int64, managerID int64) error
+	SetFavoriteTeamByID(ctx context.Context, userID int64, teamID int64) error
+	SetFavoriteTournamentByID(ctx context.Context, userID int64, tournamentID int64) error
 }

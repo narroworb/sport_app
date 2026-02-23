@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/narroworb/core_api/internal/middleware"
 )
 
 const (
@@ -17,12 +15,13 @@ const (
 )
 
 type HandlerRepo struct {
-	db      DatabaseInterface
+	adb     AnalyticDatabaseInterface
+	tdb     TransactionDatabaseInterface
 	cacheDB CacheInterface
 }
 
-func NewHandlerRepo(db DatabaseInterface, cacheDB CacheInterface) *HandlerRepo {
-	return &HandlerRepo{db: db, cacheDB: cacheDB}
+func NewHandlerRepo(adb AnalyticDatabaseInterface, tdb TransactionDatabaseInterface, cacheDB CacheInterface) *HandlerRepo {
+	return &HandlerRepo{adb: adb, tdb: tdb, cacheDB: cacheDB}
 }
 
 func (h *HandlerRepo) writeJSON(w http.ResponseWriter, status int, data any) ([]byte, error) {
@@ -45,27 +44,6 @@ func (h *HandlerRepo) writeJSON(w http.ResponseWriter, status int, data any) ([]
 }
 
 func (h *HandlerRepo) Search(w http.ResponseWriter, r *http.Request) {
-}
-
-func (h *HandlerRepo) GetFavouritePlayers(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value(middleware.UsernameKey).(string)
-	userID := r.Context().Value(middleware.UserIDKey).(int64)
-
-	_, _ = username, userID
-}
-
-func (h *HandlerRepo) GetFavouriteTeams(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value(middleware.UsernameKey).(string)
-	userID := r.Context().Value(middleware.UserIDKey).(int64)
-
-	_, _ = username, userID
-}
-
-func (h *HandlerRepo) GetFavouriteManagers(w http.ResponseWriter, r *http.Request) {
-	username := r.Context().Value(middleware.UsernameKey).(string)
-	userID := r.Context().Value(middleware.UserIDKey).(int64)
-
-	_, _ = username, userID
 }
 
 func validateAndFormatSeason(season string) string {

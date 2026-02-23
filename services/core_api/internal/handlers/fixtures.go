@@ -40,7 +40,7 @@ func (h *HandlerRepo) GetFixtureDetails(w http.ResponseWriter, r *http.Request) 
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	fixtureDetails, err := h.db.GetMatchByID(ctxDB, uint32(id))
+	fixtureDetails, err := h.adb.GetMatchByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "fixture not found"})
@@ -89,7 +89,7 @@ func (h *HandlerRepo) GetFixturesByDate(w http.ResponseWriter, r *http.Request) 
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	matches, err := h.db.GetMatchesByDate(ctxMainDB, date)
+	matches, err := h.adb.GetMatchesByDate(ctxMainDB, date)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "fixtures not found"})
@@ -145,7 +145,7 @@ func (h *HandlerRepo) GetFixturePlayersStats(w http.ResponseWriter, r *http.Requ
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	stats, err := h.db.GetMatchPlayersStats(ctxMainDB, uint32(id))
+	stats, err := h.adb.GetMatchPlayersStats(ctxMainDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "fixture stats not found"})
@@ -201,7 +201,7 @@ func (h *HandlerRepo) GetFixtureGoaliesStats(w http.ResponseWriter, r *http.Requ
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	stats, err := h.db.GetMatchGoaliesStats(ctxMainDB, uint32(id))
+	stats, err := h.adb.GetMatchGoaliesStats(ctxMainDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "fixture stats not found"})
@@ -257,7 +257,7 @@ func (h *HandlerRepo) GetFixtureTeamsStats(w http.ResponseWriter, r *http.Reques
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	stats, err := h.db.GetMatchTeamsStats(ctxMainDB, uint32(id))
+	stats, err := h.adb.GetMatchTeamsStats(ctxMainDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "fixture stats not found"})

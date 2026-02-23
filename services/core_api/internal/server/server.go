@@ -14,9 +14,9 @@ type ServerRepo struct {
 	port     string
 }
 
-func NewServerRepo(db handlers.DatabaseInterface, cacheDB handlers.CacheInterface, port string) *ServerRepo {
+func NewServerRepo(adb handlers.AnalyticDatabaseInterface, tdb handlers.TransactionDatabaseInterface, cacheDB handlers.CacheInterface, port string) *ServerRepo {
 	return &ServerRepo{
-		handlers: *handlers.NewHandlerRepo(db, cacheDB),
+		handlers: *handlers.NewHandlerRepo(adb, tdb, cacheDB),
 		port:     port,
 	}
 }
@@ -32,12 +32,16 @@ func (s *ServerRepo) Run() error {
 	r.Mount("/api/manager", s.managerRoutes())
 	r.Mount("/api/fixture", s.fixtureRoutes())
 
-	r.Route("/api", func(r chi.Router) {
+	r.Group(func(r chi.Router) {
 		r.Use(middleware.JWTAuth)
-
-		r.Get("/player/favorites", s.handlers.GetFavouritePlayers)
-		r.Get("/team/favorites", s.handlers.GetFavouriteTeams)
-		r.Get("/manager/favorites", s.handlers.GetFavouriteManagers)
+		r.Get("/api/player/favorite", s.handlers.GetFavouritePlayers)
+		r.Post("/api/player/{id}/favorite", s.handlers.SetFavouritePlayer)
+		r.Get("/api/team/favorite", s.handlers.GetFavouriteTeams)
+		r.Post("/api/team/{id}/favorite", s.handlers.SetFavouriteTeam)
+		r.Get("/api/manager/favorite", s.handlers.GetFavouriteManagers)
+		r.Post("/api/manager/{id}/favorite", s.handlers.SetFavouriteManager)
+		r.Get("/api/tournament/favorite", s.handlers.GetFavouriteTournaments)
+		r.Post("/api/tournament/{id}/favorite", s.handlers.SetFavouriteTournament)
 	})
 
 	return http.ListenAndServe(":"+s.port, r)

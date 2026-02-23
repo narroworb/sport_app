@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/narroworb/core_api/internal/middleware"
 	"github.com/narroworb/core_api/internal/models"
 )
 
@@ -41,7 +42,7 @@ func (h *HandlerRepo) GetManagerDetails(w http.ResponseWriter, r *http.Request) 
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	managerDetails, err := h.db.GetManagerByID(ctxDB, uint32(id))
+	managerDetails, err := h.adb.GetManagerByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "manager not found"})
@@ -103,13 +104,13 @@ func (h *HandlerRepo) GetManagerStats(w http.ResponseWriter, r *http.Request) {
 	var cacheKey string
 
 	if bySeason == "true" {
-		getStatsFromDB = h.db.GetManagerStatsBySeason
+		getStatsFromDB = h.adb.GetManagerStatsBySeason
 		cacheKey = fmt.Sprintf("manager:%d:stats:by_season", id)
 	} else if byTeam == "true" {
-		getStatsFromDB = h.db.GetManagerStatsByTeam
+		getStatsFromDB = h.adb.GetManagerStatsByTeam
 		cacheKey = fmt.Sprintf("manager:%d:stats:by_team", id)
 	} else {
-		getStatsFromDB = h.db.GetManagerFullStats
+		getStatsFromDB = h.adb.GetManagerFullStats
 		cacheKey = fmt.Sprintf("manager:%d:stats:full", id)
 	}
 
@@ -140,7 +141,7 @@ func (h *HandlerRepo) GetManagerStats(w http.ResponseWriter, r *http.Request) {
 	if cacheKey == fmt.Sprintf("manager:%d:stats:full", id) {
 		ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 		defer cancelMainDB()
-		yellowCards, redCards, err := h.db.GetManagerCardsByID(ctxMainDB, uint32(id))
+		yellowCards, redCards, err := h.adb.GetManagerCardsByID(ctxMainDB, uint32(id))
 		if err != nil {
 			h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
 			log.Printf("error in GetManagerCardsByID: %v\n", err)
@@ -198,7 +199,7 @@ func (h *HandlerRepo) GetManagerTeams(w http.ResponseWriter, r *http.Request) {
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	managerTeams, err := h.db.GetManagerTeams(ctxMainDB, uint32(id))
+	managerTeams, err := h.adb.GetManagerTeams(ctxMainDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "manager teams not found"})
@@ -279,7 +280,7 @@ func (h *HandlerRepo) GetManagerFixtures(w http.ResponseWriter, r *http.Request)
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	managerFixtures, err := h.db.GetManagerFixtures(ctxMainDB, uint32(id), uint32(limit), uint32(offset))
+	managerFixtures, err := h.adb.GetManagerFixtures(ctxMainDB, uint32(id), uint32(limit), uint32(offset))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "manager fixtures not found"})
@@ -304,5 +305,115 @@ func (h *HandlerRepo) GetManagerFixtures(w http.ResponseWriter, r *http.Request)
 	} else {
 		log.Printf("error in writeJSON from GetManagerFixtures: %v\n", err)
 		fmt.Printf("%+v\n", managerFixtures)
+	}
+}
+
+func (h *HandlerRepo) GetFavouriteManagers(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	cacheKey := fmt.Sprintf("user:%d:managers", userID)
+
+	ctxCache, cancelCache := context.WithTimeout(r.Context(), cacheTimeout)
+	defer cancelCache()
+	cached, err := h.cacheDB.Get(ctxCache, cacheKey)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(cached))
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	managerIDs, err := h.tdb.GetFavoriteManagersIDs(ctxTransactDB, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "favorite managers not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetFavoriteManagersIDs: %v\n", err)
+		return
+	}
+
+	managers := make([]models.Manager, 0, len(managerIDs))
+
+	for _, id := range managerIDs {
+		ctxAnalyticDB, cancelAnalyticDB := context.WithTimeout(r.Context(), dbTimeout)
+		defer cancelAnalyticDB()
+		manager, err := h.adb.GetManagerByID(ctxAnalyticDB, id)
+		if err != nil {
+			h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+			log.Printf("error in GetManagerByID: %v\n", err)
+			return
+		}
+
+		managers = append(managers, manager)
+	}
+
+	resp, err := h.writeJSON(w, http.StatusOK, managers)
+	if err == nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+			defer cancel()
+
+			if err := h.cacheDB.Set(ctx, cacheKey, resp, cacheTTL); err != nil {
+				log.Printf("error in set to cache from GetFavoriteManagers: %v\n", err)
+			}
+		}()
+	} else {
+		log.Printf("error in writeJSON from GetFavoriteManagers: %v\n", err)
+		fmt.Printf("%+v\n", managers)
+	}
+}
+
+func (h *HandlerRepo) SetFavouriteManager(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	idStr := chi.URLParam(r, "id")
+
+	if idStr == "" {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty id parameter in query"})
+		return
+	}
+
+	managerID, err := strconv.Atoi(idStr)
+	if err != nil || managerID < 1 {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id parameter in query"})
+		return
+	}
+
+	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelDB()
+	_, err = h.adb.GetManagerByID(ctxDB, uint32(managerID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "manager not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetManagerByID: %v\n", err)
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	err = h.tdb.SetFavoriteManagerByID(ctxTransactDB, userID, int64(managerID))
+	if err != nil {
+		if err.Error() == fmt.Sprintf("manager with ID=%d already favorite", managerID) {
+			h.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in SetFavoriteManagerByID: %v\n", err)
+		return
+	}
+
+	_, err = h.writeJSON(w, http.StatusCreated, nil)
+	if err != nil {
+		log.Printf("error in writeJSON from SetFavoriteManager: %v\n", err)
 	}
 }

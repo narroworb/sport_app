@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/narroworb/core_api/internal/middleware"
 	"github.com/narroworb/core_api/internal/models"
 )
 
@@ -42,7 +43,7 @@ func (h *HandlerRepo) GetTeamDetails(w http.ResponseWriter, r *http.Request) {
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	teamDetails, err := h.db.GetTeamByID(ctxDB, uint32(id))
+	teamDetails, err := h.adb.GetTeamByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team not found"})
@@ -123,13 +124,13 @@ func (h *HandlerRepo) GetTeamStats(w http.ResponseWriter, r *http.Request) {
 	var cacheKey string
 
 	if filter.Season != "" {
-		getStatsFromDB = h.db.GetTeamStatsBySeason
+		getStatsFromDB = h.adb.GetTeamStatsBySeason
 		cacheKey = "team:" + fmt.Sprint(id) + ":stats:season:" + filter.Season
 	} else if (filter.ToDate != time.Time{} || filter.FromDate != time.Time{}) {
-		getStatsFromDB = h.db.GetTeamStatsByDates
+		getStatsFromDB = h.adb.GetTeamStatsByDates
 		cacheKey = "team:" + fmt.Sprint(id) + ":stats:dates:" + fmt.Sprintf("%s_%s", filter.FromDate, filter.ToDate)
 	} else {
-		getStatsFromDB = h.db.GetTeamFullStats
+		getStatsFromDB = h.adb.GetTeamFullStats
 		cacheKey = "team:" + fmt.Sprint(id) + ":stats:full"
 	}
 
@@ -212,7 +213,7 @@ func (h *HandlerRepo) GetTeamStandings(w http.ResponseWriter, r *http.Request) {
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	teamStats, err := h.db.GetStandingsByTeamAndSeason(ctxMainDB, uint32(id), seasonParam)
+	teamStats, err := h.adb.GetStandingsByTeamAndSeason(ctxMainDB, uint32(id), seasonParam)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team standings not found"})
@@ -268,7 +269,7 @@ func (h *HandlerRepo) GetTeamNextGame(w http.ResponseWriter, r *http.Request) {
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	match, err := h.db.GetTeamNextGame(ctxMainDB, uint32(id))
+	match, err := h.adb.GetTeamNextGame(ctxMainDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team next game not found"})
@@ -335,7 +336,7 @@ func (h *HandlerRepo) GetTeamPlayers(w http.ResponseWriter, r *http.Request) {
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	teamPlayers, err := h.db.GetTeamPlayersBySeason(ctxMainDB, uint32(id), seasonParam)
+	teamPlayers, err := h.adb.GetTeamPlayersBySeason(ctxMainDB, uint32(id), seasonParam)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team players not found"})
@@ -416,7 +417,7 @@ func (h *HandlerRepo) GetTeamLastGames(w http.ResponseWriter, r *http.Request) {
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	matches, err := h.db.GetTeamLastGames(ctxMainDB, uint32(id), uint32(limit), uint32(offset))
+	matches, err := h.adb.GetTeamLastGames(ctxMainDB, uint32(id), uint32(limit), uint32(offset))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team last games not found"})
@@ -472,7 +473,7 @@ func (h *HandlerRepo) GetTeamManager(w http.ResponseWriter, r *http.Request) {
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	manager, err := h.db.GetCurrentManagerByTeam(ctxMainDB, uint32(id))
+	manager, err := h.adb.GetCurrentManagerByTeam(ctxMainDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || manager.ID == 1 {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team manager not found"})
@@ -539,7 +540,7 @@ func (h *HandlerRepo) GetTeamPlayersWithStats(w http.ResponseWriter, r *http.Req
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	teamPlayers, err := h.db.GetTeamPlayersWithStatsBySeason(ctxMainDB, uint32(id), seasonParam)
+	teamPlayers, err := h.adb.GetTeamPlayersWithStatsBySeason(ctxMainDB, uint32(id), seasonParam)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team players not found"})
@@ -564,5 +565,115 @@ func (h *HandlerRepo) GetTeamPlayersWithStats(w http.ResponseWriter, r *http.Req
 	} else {
 		log.Printf("error in writeJSON from GetTeamPlayersWithStatsBySeason: %v\n", err)
 		fmt.Printf("%+v\n", teamPlayers)
+	}
+}
+
+func (h *HandlerRepo) GetFavouriteTeams(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	cacheKey := fmt.Sprintf("user:%d:teams", userID)
+
+	ctxCache, cancelCache := context.WithTimeout(r.Context(), cacheTimeout)
+	defer cancelCache()
+	cached, err := h.cacheDB.Get(ctxCache, cacheKey)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(cached))
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	teamIDs, err := h.tdb.GetFavoriteTeamsIDs(ctxTransactDB, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "favorite teams not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetFavoriteTeamsIDs: %v\n", err)
+		return
+	}
+
+	teams := make([]models.Team, 0, len(teamIDs))
+
+	for _, id := range teamIDs {
+		ctxAnalyticDB, cancelAnalyticDB := context.WithTimeout(r.Context(), dbTimeout)
+		defer cancelAnalyticDB()
+		team, err := h.adb.GetTeamByID(ctxAnalyticDB, id)
+		if err != nil {
+			h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+			log.Printf("error in GetTeamByID: %v\n", err)
+			return
+		}
+
+		teams = append(teams, team)
+	}
+
+	resp, err := h.writeJSON(w, http.StatusOK, teams)
+	if err == nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+			defer cancel()
+
+			if err := h.cacheDB.Set(ctx, cacheKey, resp, cacheTTL); err != nil {
+				log.Printf("error in set to cache from GetFavoriteTeams: %v\n", err)
+			}
+		}()
+	} else {
+		log.Printf("error in writeJSON from GetFavoriteTeams: %v\n", err)
+		fmt.Printf("%+v\n", teams)
+	}
+}
+
+func (h *HandlerRepo) SetFavouriteTeam(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	idStr := chi.URLParam(r, "id")
+
+	if idStr == "" {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty id parameter in query"})
+		return
+	}
+
+	teamID, err := strconv.Atoi(idStr)
+	if err != nil || teamID < 1 {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id parameter in query"})
+		return
+	}
+
+	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelDB()
+	_, err = h.adb.GetTeamByID(ctxDB, uint32(teamID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GEtTeamByID: %v\n", err)
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	err = h.tdb.SetFavoriteTeamByID(ctxTransactDB, userID, int64(teamID))
+	if err != nil {
+		if err.Error() == fmt.Sprintf("team with ID=%d already favorite", teamID) {
+			h.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in SetFavoriteTeamByID: %v\n", err)
+		return
+	}
+
+	_, err = h.writeJSON(w, http.StatusCreated, nil)
+	if err != nil {
+		log.Printf("error in writeJSON from SetFavoriteTeam: %v\n", err)
 	}
 }

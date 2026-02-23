@@ -10,6 +10,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/narroworb/core_api/internal/middleware"
+	"github.com/narroworb/core_api/internal/models"
 )
 
 func (h *HandlerRepo) GetTournamentDetails(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +42,7 @@ func (h *HandlerRepo) GetTournamentDetails(w http.ResponseWriter, r *http.Reques
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	tournamentDetails, err := h.db.GetTournamentByID(ctxDB, uint32(id))
+	tournamentDetails, err := h.adb.GetTournamentByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "tournament not found"})
@@ -95,7 +97,7 @@ func (h *HandlerRepo) GetTournamentTable(w http.ResponseWriter, r *http.Request)
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	tournamentTable, err := h.db.GetTournamentTableByID(ctxDB, uint32(id))
+	tournamentTable, err := h.adb.GetTournamentTableByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "tournament table not found"})
@@ -150,7 +152,7 @@ func (h *HandlerRepo) GetTournamentFixtures(w http.ResponseWriter, r *http.Reque
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	tournamentFixtures, err := h.db.GetTournamentFixturesByID(ctxDB, uint32(id))
+	tournamentFixtures, err := h.adb.GetTournamentFixturesByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "tournament fixtures not found"})
@@ -205,7 +207,7 @@ func (h *HandlerRepo) GetTournamentTeamsStats(w http.ResponseWriter, r *http.Req
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	tournamentStats, err := h.db.GetTournamentTeamsStatsByID(ctxDB, uint32(id))
+	tournamentStats, err := h.adb.GetTournamentTeamsStatsByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "tournament team stats not found"})
@@ -289,7 +291,7 @@ func (h *HandlerRepo) GetTournamentPlayersStats(w http.ResponseWriter, r *http.R
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	tournamentStats, err := h.db.GetTournamentPlayersStatsByID(ctxDB, uint32(id), uint32(limit), uint32(offset))
+	tournamentStats, err := h.adb.GetTournamentPlayersStatsByID(ctxDB, uint32(id), uint32(limit), uint32(offset))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "tournament player stats not found"})
@@ -344,7 +346,7 @@ func (h *HandlerRepo) GetTournamentTableGraph(w http.ResponseWriter, r *http.Req
 
 	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelDB()
-	tournamentTableGraph, err := h.db.GetTournamentTableGraphByID(ctxDB, uint32(id))
+	tournamentTableGraph, err := h.adb.GetTournamentTableGraphByID(ctxDB, uint32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "tournament table graph not found"})
@@ -368,5 +370,115 @@ func (h *HandlerRepo) GetTournamentTableGraph(w http.ResponseWriter, r *http.Req
 		}()
 	} else {
 		log.Printf("error in writeJSON from GetTournamentTableGraphByID: %v\n", err)
+	}
+}
+
+func (h *HandlerRepo) GetFavouriteTournaments(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	cacheKey := fmt.Sprintf("user:%d:tournaments", userID)
+
+	ctxCache, cancelCache := context.WithTimeout(r.Context(), cacheTimeout)
+	defer cancelCache()
+	cached, err := h.cacheDB.Get(ctxCache, cacheKey)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(cached))
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	tournamentIDs, err := h.tdb.GetFavoriteTournamentIDs(ctxTransactDB, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "favorite tournaments not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetFavoriteTournamentIDs: %v\n", err)
+		return
+	}
+
+	tournaments := make([]models.Tournament, 0, len(tournamentIDs))
+
+	for _, id := range tournamentIDs {
+		ctxAnalyticDB, cancelAnalyticDB := context.WithTimeout(r.Context(), dbTimeout)
+		defer cancelAnalyticDB()
+		tournament, err := h.adb.GetTournamentByID(ctxAnalyticDB, id)
+		if err != nil {
+			h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+			log.Printf("error in GetTournamentByID: %v\n", err)
+			return
+		}
+
+		tournaments = append(tournaments, tournament)
+	}
+
+	resp, err := h.writeJSON(w, http.StatusOK, tournaments)
+	if err == nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+			defer cancel()
+
+			if err := h.cacheDB.Set(ctx, cacheKey, resp, cacheTTL); err != nil {
+				log.Printf("error in set to cache from GetFavoriteTournaments: %v\n", err)
+			}
+		}()
+	} else {
+		log.Printf("error in writeJSON from GetFavoriteTournaments: %v\n", err)
+		fmt.Printf("%+v\n", tournaments)
+	}
+}
+
+func (h *HandlerRepo) SetFavouriteTournament(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	idStr := chi.URLParam(r, "id")
+
+	if idStr == "" {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty id parameter in query"})
+		return
+	}
+
+	tournamentID, err := strconv.Atoi(idStr)
+	if err != nil || tournamentID < 1 {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id parameter in query"})
+		return
+	}
+
+	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelDB()
+	_, err = h.adb.GetTournamentByID(ctxDB, uint32(tournamentID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "tournament not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetTournamentByID: %v\n", err)
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	err = h.tdb.SetFavoriteTournamentByID(ctxTransactDB, userID, int64(tournamentID))
+	if err != nil {
+		if err.Error() == fmt.Sprintf("tournament with ID=%d already favorite", tournamentID) {
+			h.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in SetFavoriteTournamentByID: %v\n", err)
+		return
+	}
+
+	_, err = h.writeJSON(w, http.StatusCreated, nil)
+	if err != nil {
+		log.Printf("error in writeJSON from SetFavoriteTournament: %v\n", err)
 	}
 }

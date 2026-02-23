@@ -15,6 +15,7 @@ services:
     restart: always
     networks:
       - data_collector_default
+      - auth_service_default
     depends_on:
       - redis
     ports:
@@ -27,3 +28,6 @@ networks:
   data_collector_default:
     external: true
     name: data_collector_default
+  auth_service_default:
+    external: true
+    name: auth_service_default

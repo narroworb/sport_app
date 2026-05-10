@@ -12,11 +12,11 @@ SELECT
   away_score
 FROM Matches m
 INNER JOIN Tournaments t ON t.tournament_id = m.tournament_id
-WHERE (m.home_team_id = {team_id:UInt32} OR m.away_team_id = {team_id:UInt32})
+WHERE (m.home_team_id = %(team_id)s OR m.away_team_id = %(team_id)s)
   AND m.status = 'Ended'
-  AND t.season = {season:String}
+  AND t.season = %(season)s
 ORDER BY m.date DESC
-LIMIT {limit:UInt32}
+LIMIT %(limit)s
 """
 
 
@@ -24,7 +24,7 @@ def player_position_sql() -> str:
     return """
 SELECT position
 FROM Athletes
-WHERE athlete_id = {player_id:UInt32}
+WHERE athlete_id = %(player_id)s
 LIMIT 1
 """
 
@@ -52,9 +52,8 @@ FROM Football_Player_Match_Stats s
 INNER JOIN Matches m ON m.match_id = s.match_id
 INNER JOIN Tournaments t ON t.tournament_id = m.tournament_id
 INNER JOIN Athletes a ON a.athlete_id = s.athlete_id
-WHERE t.season = {season:String}
+WHERE t.season = %(season)s
   AND m.status = 'Ended'
 GROUP BY s.athlete_id
-HAVING minutes >= {min_minutes:UInt32}
+HAVING minutes >= %(min_minutes)s
 """
-

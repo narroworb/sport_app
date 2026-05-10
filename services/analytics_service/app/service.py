@@ -64,32 +64,32 @@ class AnalyticsEngine:
 
     def health(self) -> tuple[str, str]:
         try:
-            self._ch.command("SELECT 1")
+            self._ch.execute("SELECT 1")
             return "ok", "ok"
         except Exception as e:  # noqa: BLE001
             return "degraded", f"error:{e}"
 
-    def get_match_win_probabilities(
-        self,
-        home_team_id: int,
-        away_team_id: int,
-        season: str,
-        matches_back: int,
-        max_goals: int,
-    ) -> MatchWinProbs:
+    def _query(self, sql: str, params: dict = None):
+        """Обертка для выполнения запросов с параметрами"""
+        result = self._ch.execute(sql, params)
+        # clickhouse-driver возвращает список кортежей
+        return result
+
+    def get_match_win_probabilities(self, home_team_id: int, away_team_id: int, season: str, matches_back: int, max_goals: int) -> MatchWinProbs:
         matches_back = int(matches_back) if matches_back else 10
         matches_back = max(3, min(40, matches_back))
         max_goals = int(max_goals) if max_goals else 10
         max_goals = max(5, min(12, max_goals))
-
-        home_rows = self._ch.query(
+        
+        # Теперь можно использовать напрямую без замены
+        home_rows = self._ch.execute(
             recent_team_matches_sql(),
-            parameters={"team_id": int(home_team_id), "season": season, "limit": matches_back},
-        ).result_rows
-        away_rows = self._ch.query(
+            {"team_id": int(home_team_id), "season": season, "limit": matches_back},
+        )
+        away_rows = self._ch.execute(
             recent_team_matches_sql(),
-            parameters={"team_id": int(away_team_id), "season": season, "limit": matches_back},
-        ).result_rows
+            {"team_id": int(away_team_id), "season": season, "limit": matches_back},
+        )
 
         def extract_gf_ga(rows: list[tuple], team_id: int) -> tuple[list[int], list[int]]:
             gf: list[int] = []
@@ -156,10 +156,12 @@ class AnalyticsEngine:
         half_life_matches = float(half_life_matches) if half_life_matches else 5.0
         half_life_matches = _clamp(half_life_matches, 1.0, 20.0)
 
-        rows = self._ch.query(
-            recent_team_matches_sql(),
-            parameters={"team_id": int(team_id), "season": season, "limit": matches_back},
-        ).result_rows
+        sql = recent_team_matches_sql().replace("{team_id}", "%(team_id)s").replace("{season}", "%(season)s").replace("{limit}", "%(limit)s")
+        
+        rows = self._ch.execute(
+            sql,
+            {"team_id": int(team_id), "season": season, "limit": matches_back},
+        )
 
         points: list[float] = []
         gf: list[float] = []
@@ -236,15 +238,12 @@ class AnalyticsEngine:
         min_minutes = int(min_minutes) if min_minutes else 600
         min_minutes = max(0, min(6000, min_minutes))
 
-        pos_rows = self._ch.query(
-            player_position_sql(), parameters={"player_id": int(player_id)}
-        ).result_rows
+        pos_sql = player_position_sql().replace("{player_id}", "%(player_id)s")
+        pos_rows = self._ch.execute(pos_sql, {"player_id": int(player_id)})
         position = str(pos_rows[0][0]) if pos_rows else ""
 
-        rows = self._ch.query(
-            aggregated_player_features_sql(),
-            parameters={"season": season, "min_minutes": int(min_minutes)},
-        ).result_rows
+        agg_sql = aggregated_player_features_sql().replace("{season}", "%(season)s").replace("{min_minutes}", "%(min_minutes)s")
+        rows = self._ch.execute(agg_sql, {"season": season, "min_minutes": int(min_minutes)})
 
         if not rows:
             return PlayerSimilarity(position=position, top=[], details="no player aggregates found")
@@ -254,23 +253,25 @@ class AnalyticsEngine:
         pos: list[str] = []
         feats: list[list[float]] = []
 
-        for (
-            athlete_id,
-            p,
-            minutes,
-            rating_avg,
-            goals,
-            assists,
-            shots_on_target,
-            total_shots,
-            key_passes,
-            duels,
-            duels_won,
-            pass_attempts,
-            complete_passes,
-            interceptions,
-            total_tackles,
-        ) in rows:
+        for row in rows:
+            # В зависимости от структуры вашего запроса, распакуйте row
+            # Если запрос возвращает все поля, то:
+            athlete_id = row[0]
+            p = row[1]
+            minutes = row[2]
+            rating_avg = row[3]
+            goals = row[4]
+            assists = row[5]
+            shots_on_target = row[6]
+            total_shots = row[7]
+            key_passes = row[8]
+            duels = row[9]
+            duels_won = row[10]
+            pass_attempts = row[11]
+            complete_passes = row[12]
+            interceptions = row[13]
+            total_tackles = row[14]
+            
             minutes = float(minutes or 0.0)
             per90 = 90.0 / minutes if minutes > 0 else 0.0
             pass_acc = _safe_div(float(complete_passes or 0.0), float(pass_attempts or 0.0))
@@ -317,4 +318,3 @@ class AnalyticsEngine:
         top = scored[:top_k]
         details = f"candidates={len(scored)}, top_k={top_k}, min_minutes={min_minutes}, position={query_pos}"
         return PlayerSimilarity(position=query_pos, top=top, details=details)
-

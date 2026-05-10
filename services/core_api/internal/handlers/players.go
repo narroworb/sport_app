@@ -467,7 +467,7 @@ func (h *HandlerRepo) SetFavouritePlayer(w http.ResponseWriter, r *http.Request)
 	defer cancelTransactDB()
 	err = h.tdb.SetFavoritePlayerByID(ctxTransactDB, userID, int64(athleteID))
 	if err != nil {
-		if err.Error() == fmt.Sprintf("player with ID=%d already favorite", athleteID) {
+		if err.Error() == fmt.Sprintf("player with ID=%d already favorite for user with ID=%d", athleteID, userID) {
 			h.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
 			return
 		}
@@ -480,5 +480,55 @@ func (h *HandlerRepo) SetFavouritePlayer(w http.ResponseWriter, r *http.Request)
 	_, err = h.writeJSON(w, http.StatusCreated, nil)
 	if err != nil {
 		log.Printf("error in writeJSON from SetFavoritePlayer: %v\n", err)
+	}
+}
+
+func (h *HandlerRepo) DeleteFavouritePlayer(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	idStr := chi.URLParam(r, "id")
+
+	if idStr == "" {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty id parameter in query"})
+		return
+	}
+
+	athleteID, err := strconv.Atoi(idStr)
+	if err != nil || athleteID < 1 {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id parameter in query"})
+		return
+	}
+
+	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelDB()
+	_, err = h.adb.GetPlayerByID(ctxDB, uint32(athleteID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "player not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetPlayerByID: %v\n", err)
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	err = h.tdb.DeleteFavoritePlayerByID(ctxTransactDB, userID, int64(athleteID))
+	if err != nil {
+		if err.Error() == fmt.Sprintf("player with ID=%d already not favorite for user with ID=%d", athleteID, userID) {
+			h.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in DeleteFavoritePlayerByID: %v\n", err)
+		return
+	}
+
+	_, err = h.writeJSON(w, http.StatusOK, nil)
+	if err != nil {
+		log.Printf("error in writeJSON from DeleteFavoritePlayer: %v\n", err)
 	}
 }

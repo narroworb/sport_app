@@ -36,12 +36,19 @@ func (s *ServerRepo) Run() error {
 		r.Use(middleware.JWTAuth)
 		r.Get("/api/player/favorite", s.handlers.GetFavouritePlayers)
 		r.Post("/api/player/{id}/favorite", s.handlers.SetFavouritePlayer)
+		r.Delete("/api/player/{id}/favorite", s.handlers.DeleteFavouritePlayer)
+
 		r.Get("/api/team/favorite", s.handlers.GetFavouriteTeams)
 		r.Post("/api/team/{id}/favorite", s.handlers.SetFavouriteTeam)
+		r.Delete("/api/team/{id}/favorite", s.handlers.DeleteFavouriteTeam)
+
 		r.Get("/api/manager/favorite", s.handlers.GetFavouriteManagers)
 		r.Post("/api/manager/{id}/favorite", s.handlers.SetFavouriteManager)
+		r.Delete("/api/manager/{id}/favorite", s.handlers.DeleteFavouriteManager)
+
 		r.Get("/api/tournament/favorite", s.handlers.GetFavouriteTournaments)
 		r.Post("/api/tournament/{id}/favorite", s.handlers.SetFavouriteTournament)
+		r.Delete("/api/tournament/{id}/favorite", s.handlers.DeleteFavouriteTournament)
 	})
 
 	return http.ListenAndServe(":"+s.port, r)

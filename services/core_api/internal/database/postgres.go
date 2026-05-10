@@ -145,7 +145,7 @@ func (p *PostgresDB) SetFavoritePlayerByID(ctx context.Context, userID int64, pl
 	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_athletes WHERE user_id=$1 AND athlete_id=$2;`, userID, playerID)
 	if err == nil {
 		tx.Rollback()
-		return fmt.Errorf("player with ID=%d already favorite", playerID)
+		return fmt.Errorf("player with ID=%d already favorite for user with ID=%d", playerID, userID)
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -168,7 +168,7 @@ func (p *PostgresDB) SetFavoriteManagerByID(ctx context.Context, userID int64, m
 	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_managers WHERE user_id=$1 AND manager_id=$2;`, userID, managerID)
 	if err == nil {
 		tx.Rollback()
-		return fmt.Errorf("manager with ID=%d already favorite", managerID)
+		return fmt.Errorf("manager with ID=%d already favorite for user with ID=%d", managerID, userID)
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -191,7 +191,7 @@ func (p *PostgresDB) SetFavoriteTeamByID(ctx context.Context, userID int64, team
 	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_teams WHERE user_id=$1 AND team_id=$2;`, userID, teamID)
 	if err == nil {
 		tx.Rollback()
-		return fmt.Errorf("team with ID=%d already favorite", teamID)
+		return fmt.Errorf("team with ID=%d already favorite for user with ID=%d", teamID, userID)
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -214,12 +214,104 @@ func (p *PostgresDB) SetFavoriteTournamentByID(ctx context.Context, userID int64
 	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_tournaments WHERE user_id=$1 AND tournament_id=$2;`, userID, tournamentID)
 	if err == nil {
 		tx.Rollback()
-		return fmt.Errorf("tournament with ID=%d already favorite", tournamentID)
+		return fmt.Errorf("tournament with ID=%d already favorite for user with ID=%d", tournamentID, userID)
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO user_favorite_tournaments(user_id, tournament_id) VALUES($1, $2);`, userID, tournamentID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (p *PostgresDB) DeleteFavoritePlayerByID(ctx context.Context, userID int64, playerID int64) error {
+	tx, err := p.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_athletes WHERE user_id=$1 AND athlete_id=$2;`, userID, playerID)
+	if errors.Is(err, sql.ErrNoRows) {
+		tx.Rollback()
+		return fmt.Errorf("player with ID=%d already not favorite for user with ID=%d", playerID, userID)
+	} else if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM user_favorite_athletes WHERE user_id=$1 AND athlete_id=$2;`, userID, playerID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (p *PostgresDB) DeleteFavoriteManagerByID(ctx context.Context, userID int64, managerID int64) error {
+	tx, err := p.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_managers WHERE user_id=$1 AND manager_id=$2;`, userID, managerID)
+	if errors.Is(err, sql.ErrNoRows) {
+		tx.Rollback()
+		return fmt.Errorf("manager with ID=%d already not favorite for user with ID=%d", managerID, userID)
+	} else if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM user_favorite_managers WHERE user_id=$1 AND manager_id=$2;`, userID, managerID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (p *PostgresDB) DeleteFavoriteTeamByID(ctx context.Context, userID int64, teamID int64) error {
+	tx, err := p.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_teams WHERE user_id=$1 AND team_id=$2;`, userID, teamID)
+	if errors.Is(err, sql.ErrNoRows) {
+		tx.Rollback()
+		return fmt.Errorf("team with ID=%d already not favorite for user with ID=%d", teamID, userID)
+	} else if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM user_favorite_teams WHERE user_id=$1 AND team_id=$2;`, userID, teamID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (p *PostgresDB) DeleteFavoriteTournamentByID(ctx context.Context, userID int64, tournamentID int64) error {
+	tx, err := p.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.QueryContext(ctx, `SELECT id FROM user_favorite_tournaments WHERE user_id=$1 AND tournament_id=$2;`, userID, tournamentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		tx.Rollback()
+		return fmt.Errorf("tournament with ID=%d already not favorite for user with ID=%d", tournamentID, userID)
+	} else if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM user_favorite_tournaments WHERE user_id=$1 AND tournament_id=$2;`, userID, tournamentID)
 	if err != nil {
 		tx.Rollback()
 		return err

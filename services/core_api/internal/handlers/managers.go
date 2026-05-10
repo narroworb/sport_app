@@ -402,7 +402,7 @@ func (h *HandlerRepo) SetFavouriteManager(w http.ResponseWriter, r *http.Request
 	defer cancelTransactDB()
 	err = h.tdb.SetFavoriteManagerByID(ctxTransactDB, userID, int64(managerID))
 	if err != nil {
-		if err.Error() == fmt.Sprintf("manager with ID=%d already favorite", managerID) {
+		if err.Error() == fmt.Sprintf("manager with ID=%d already favorite for user with ID=%d", managerID, userID) {
 			h.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
 			return
 		}
@@ -415,5 +415,55 @@ func (h *HandlerRepo) SetFavouriteManager(w http.ResponseWriter, r *http.Request
 	_, err = h.writeJSON(w, http.StatusCreated, nil)
 	if err != nil {
 		log.Printf("error in writeJSON from SetFavoriteManager: %v\n", err)
+	}
+}
+
+func (h *HandlerRepo) DeleteFavouriteManager(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(int64)
+
+	idStr := chi.URLParam(r, "id")
+
+	if idStr == "" {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "empty id parameter in query"})
+		return
+	}
+
+	managerID, err := strconv.Atoi(idStr)
+	if err != nil || managerID < 1 {
+		h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id parameter in query"})
+		return
+	}
+
+	ctxDB, cancelDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelDB()
+	_, err = h.adb.GetManagerByID(ctxDB, uint32(managerID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "manager not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetManagerByID: %v\n", err)
+		return
+	}
+
+	ctxTransactDB, cancelTransactDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelTransactDB()
+	err = h.tdb.DeleteFavoriteManagerByID(ctxTransactDB, userID, int64(managerID))
+	if err != nil {
+		if err.Error() == fmt.Sprintf("manager with ID=%d already not favorite for user with ID=%d", managerID, userID) {
+			h.writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in DeleteFavoriteManagerByID: %v\n", err)
+		return
+	}
+
+	_, err = h.writeJSON(w, http.StatusOK, nil)
+	if err != nil {
+		log.Printf("error in writeJSON from DeleteFavoriteManager: %v\n", err)
 	}
 }

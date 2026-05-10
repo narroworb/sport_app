@@ -63,4 +63,9 @@ type TransactionDatabaseInterface interface {
 	SetFavoriteManagerByID(ctx context.Context, userID int64, managerID int64) error
 	SetFavoriteTeamByID(ctx context.Context, userID int64, teamID int64) error
 	SetFavoriteTournamentByID(ctx context.Context, userID int64, tournamentID int64) error
+
+	DeleteFavoritePlayerByID(ctx context.Context, userID int64, playerID int64) error
+	DeleteFavoriteManagerByID(ctx context.Context, userID int64, managerID int64) error
+	DeleteFavoriteTeamByID(ctx context.Context, userID int64, teamID int64) error
+	DeleteFavoriteTournamentByID(ctx context.Context, userID int64, tournamentID int64) error
 }

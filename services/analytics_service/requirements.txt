@@ -1,6 +1,6 @@
 grpcio==1.74.0
 grpcio-tools==1.74.0
-protobuf==5.29.5
-clickhouse-connect==0.8.18
+protobuf==6.31.1
+clickhouse-driver>=0.2.0
 numpy==2.0.2
 

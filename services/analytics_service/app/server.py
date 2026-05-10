@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import sys
 import logging
 import os
 import signal
@@ -8,12 +7,15 @@ from concurrent import futures
 
 import grpc
 
+# Добавляем путь к сгенерированным файлам
+sys.path.insert(0, '/app/app/gen')
+
+from analytics.v1 import analytics_pb2, analytics_pb2_grpc
+
 from app.clickhouse_client import create_client
 from app.config import load_config
 from app.service import AnalyticsEngine
 
-# Generated code (grpcio-tools) lives in app/gen
-from app.gen.analytics.v1 import analytics_pb2, analytics_pb2_grpc  # type: ignore
 
 
 class AnalyticsGrpcService(analytics_pb2_grpc.AnalyticsServiceServicer):

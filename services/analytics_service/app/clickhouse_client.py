@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import clickhouse_connect
+from clickhouse_driver import Client
 
 
 @dataclass(frozen=True)
@@ -26,14 +26,11 @@ def _parse_addr(addr: str) -> ClickHouseConnInfo:
 
 def create_client(database_addr: str, database: str, username: str, password: str):
     info = _parse_addr(database_addr)
-    # Use HTTP protocol (8123) to keep runtime simple.
-    return clickhouse_connect.get_client(
-        host=info.host,
-        port=info.port,
-        username=username,
-        password=password,
-        database=database,
-        connect_timeout=5,
-        send_receive_timeout=20,
-    )
+    return Client(
+    host=info.host,
+    port=info.port,       
+    user=username,
+    password=password,
+    database=database
+)
 

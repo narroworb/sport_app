@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"github.com/narroworb/core_api/internal/analytics"
 	"github.com/narroworb/core_api/internal/handlers"
 	"github.com/narroworb/core_api/internal/middleware"
 
@@ -10,14 +11,27 @@ import (
 )
 
 type ServerRepo struct {
-	handlers handlers.HandlerRepo
-	port     string
+	handlers  handlers.HandlerRepo
+	analytics *analytics.HTTPHandler
+	port      string
 }
 
 func NewServerRepo(adb handlers.AnalyticDatabaseInterface, tdb handlers.TransactionDatabaseInterface, cacheDB handlers.CacheInterface, port string) *ServerRepo {
+	analyticsClient, err := analytics.NewClient()
+	if err != nil {
+		// Analytics is optional: core API should still start if analytics service is down.
+		analyticsClient = nil
+	}
+
+	var analyticsHTTP *analytics.HTTPHandler
+	if analyticsClient != nil {
+		analyticsHTTP = analytics.NewHTTPHandler(analyticsClient.Raw())
+	}
+
 	return &ServerRepo{
-		handlers: *handlers.NewHandlerRepo(adb, tdb, cacheDB),
-		port:     port,
+		handlers:  *handlers.NewHandlerRepo(adb, tdb, cacheDB),
+		analytics: analyticsHTTP,
+		port:      port,
 	}
 }
 
@@ -25,6 +39,10 @@ func (s *ServerRepo) Run() error {
 	r := chi.NewRouter()
 
 	r.Get("/api/search", s.handlers.Search)
+
+	if s.analytics != nil {
+		r.Mount("/api/analytics", s.analytics.Routes())
+	}
 
 	r.Mount("/api/player", s.playerRoutes())
 	r.Mount("/api/team", s.teamRoutes())

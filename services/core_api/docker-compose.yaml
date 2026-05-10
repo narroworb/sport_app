@@ -22,6 +22,8 @@ services:
       - "8082:8082"
     env_file:
       - .env
+    environment:
+      ANALYTICS_GRPC_ADDR: ${ANALYTICS_GRPC_ADDR:-analytics_service:50051}
     command: ["./core_api"]
 
 networks:

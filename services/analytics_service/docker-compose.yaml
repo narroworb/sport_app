@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  analytics_service:
+    build:
+      context: ../..
+      dockerfile: services/analytics_service/Dockerfile
+    container_name: analytics_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # If DATABASE_ADDR is not provided in .env, default to ClickHouse in data_collector compose.
+      DATABASE_ADDR: ${DATABASE_ADDR:-clickhouse:8123}
+      DB_NAME: ${DB_NAME:-default}
+      DB_USER: ${DB_USER:-default}
+      DB_PASS: ${DB_PASS:-}
+      ANALYTICS_GRPC_PORT: ${ANALYTICS_GRPC_PORT:-50051}
+    ports:
+      - "50051:50051"
+    networks:
+      - data_collector_default
+
+networks:
+  data_collector_default:
+    external: true
+    name: data_collector_default
+

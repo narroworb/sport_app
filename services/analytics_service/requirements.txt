@@ -1,0 +1,6 @@
+grpcio==1.74.0
+grpcio-tools==1.74.0
+protobuf==5.29.5
+clickhouse-connect==0.8.18
+numpy==2.0.2
+

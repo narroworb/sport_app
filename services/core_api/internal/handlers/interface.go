@@ -46,6 +46,15 @@ type AnalyticDatabaseInterface interface {
 	GetMatchPlayersStats(ctx context.Context, id uint32) (map[string][]models.PlayerStatsInMatch, error)
 	GetMatchGoaliesStats(ctx context.Context, id uint32) (map[string][]models.GoalieStatsInMatch, error)
 	GetMatchTeamsStats(ctx context.Context, id uint32) (models.TeamMatchStats, error)
+	GetUnindexedPlayers(ctx context.Context) ([]models.Player, error)
+	GetUnindexedManagers(ctx context.Context) ([]models.Manager, error)
+	GetUnindexedTeams(ctx context.Context) ([]models.Team, error)
+	GetUnindexedTournaments(ctx context.Context) ([]models.Tournament, error)
+
+	UpdateBatchPlayersIndexedStatus(ctx context.Context, ids []uint32) error
+	UpdateBatchManagersIndexedStatus(ctx context.Context, ids []uint32) error
+	UpdateBatchTeamsIndexedStatus(ctx context.Context, ids []uint32) error
+	UpdateBatchTournamentsIndexedStatus(ctx context.Context, ids []uint32) error
 }
 
 type CacheInterface interface {
@@ -72,10 +81,5 @@ type TransactionDatabaseInterface interface {
 
 type SearchDatabaseInterface interface {
 	Search(ctx context.Context, query string, entityType string, filters models.SearchFilters) ([]models.SearchResult, error)
-	IndexPlayer(ctx context.Context, player models.Player) error
-	IndexTeam(ctx context.Context, team models.Team) error
-	IndexManager(ctx context.Context, manager models.Manager) error
-	IndexTournament(ctx context.Context, tournament models.Tournament) error
-	DeleteIndex(ctx context.Context, index string) error
+	RunIndexing(ctx context.Context) error
 }
-

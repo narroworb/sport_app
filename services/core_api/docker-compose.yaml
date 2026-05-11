@@ -25,6 +25,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
 
   core_api:
     build: .
@@ -53,3 +55,8 @@ networks:
   auth_service_default:
     external: true
     name: auth_service_default
+
+    
+volumes:
+  elasticsearch_data:
+    driver: local

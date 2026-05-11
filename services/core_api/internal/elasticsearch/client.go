@@ -11,14 +11,16 @@ import (
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
+	"github.com/narroworb/core_api/internal/handlers"
 	"github.com/narroworb/core_api/internal/models"
 )
 
 type Elasticsearch struct {
 	client *elasticsearch.Client
+	db     handlers.AnalyticDatabaseInterface
 }
 
-func NewElasticsearch() (*Elasticsearch, error) {
+func NewElasticsearch(db handlers.AnalyticDatabaseInterface) (*Elasticsearch, error) {
 	addr := os.Getenv("ELASTICSEARCH_ADDR")
 	if addr == "" {
 		addr = "http://localhost:9200"
@@ -42,10 +44,12 @@ func NewElasticsearch() (*Elasticsearch, error) {
 	}
 	res.Body.Close()
 
-	es := &Elasticsearch{client: client}
+	es := &Elasticsearch{client: client, db: db}
 	if err := es.createIndices(ctx); err != nil {
 		return nil, fmt.Errorf("failed to create indices: %w", err)
 	}
+
+	go es.endlessIndexing()
 
 	return es, nil
 }
@@ -319,20 +323,47 @@ func (es *Elasticsearch) getSearchFields(entityType string) []string {
 	}
 }
 
-func (es *Elasticsearch) IndexPlayer(ctx context.Context, player models.Player) error {
-	return es.indexDocument(ctx, "players", player.ID, player)
+func (es *Elasticsearch) indexPlayer(ctx context.Context, player models.Player) error {
+	esPlayer := map[string]interface{}{
+		"id":             player.ID,
+		"first_name":     player.FirstName,
+		"last_name":      player.LastName,
+		"position":       player.Position,
+		"nation":         player.Nation.Name,
+		"current_status": player.CurrentStatus,
+		"height":         player.Height,
+		"url_photo":      player.URLPhoto,
+	}
+
+	return es.indexDocument(ctx, "players", player.ID, esPlayer)
 }
 
-func (es *Elasticsearch) IndexTeam(ctx context.Context, team models.Team) error {
+func (es *Elasticsearch) indexTeam(ctx context.Context, team models.Team) error {
 	return es.indexDocument(ctx, "teams", team.ID, team)
 }
 
-func (es *Elasticsearch) IndexManager(ctx context.Context, manager models.Manager) error {
-	return es.indexDocument(ctx, "managers", manager.ID, manager)
+func (es *Elasticsearch) indexManager(ctx context.Context, manager models.Manager) error {
+	esManager := map[string]interface{}{
+		"id":         manager.ID,
+		"first_name": manager.FirstName,
+		"last_name":  manager.LastName,
+		"nation":     manager.Nation.Name,
+		"url_photo":  manager.URLPhoto,
+	}
+
+	return es.indexDocument(ctx, "managers", manager.ID, esManager)
 }
 
-func (es *Elasticsearch) IndexTournament(ctx context.Context, tournament models.Tournament) error {
-	return es.indexDocument(ctx, "tournaments", tournament.ID, tournament)
+func (es *Elasticsearch) indexTournament(ctx context.Context, tournament models.Tournament) error {
+	esTournament := map[string]interface{}{
+		"id":       tournament.ID,
+		"name":     tournament.Name,
+		"country":  tournament.Country.Name,
+		"season":   tournament.Season,
+		"url_logo": tournament.URLLogo,
+	}
+
+	return es.indexDocument(ctx, "tournaments", tournament.ID, esTournament)
 }
 
 func (es *Elasticsearch) indexDocument(ctx context.Context, index string, id uint32, doc interface{}) error {
@@ -353,7 +384,24 @@ func (es *Elasticsearch) indexDocument(ctx context.Context, index string, id uin
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("index error: status %d", res.StatusCode)
+		var errMsg struct {
+			Error struct {
+				Type      string `json:"type"`
+				Reason    string `json:"reason"`
+				RootCause []struct {
+					Type   string `json:"type"`
+					Reason string `json:"reason"`
+				} `json:"root_cause"`
+			} `json:"error"`
+			Status int `json:"status"`
+		}
+
+		if err := json.NewDecoder(res.Body).Decode(&errMsg); err != nil {
+			return fmt.Errorf("index error: status %d, body: %s", res.StatusCode, res.String())
+		}
+
+		return fmt.Errorf("index error: %s - %s (status %d)",
+			errMsg.Error.Type, errMsg.Error.Reason, res.StatusCode)
 	}
 
 	return nil

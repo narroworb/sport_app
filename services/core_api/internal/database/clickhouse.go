@@ -2280,3 +2280,92 @@ func (c *ClichouseDB) GetMatchTeamsStats(ctx context.Context, id uint32) (models
 
 	return stats, nil
 }
+
+func (c *ClichouseDB) GetUnindexedPlayers(ctx context.Context) ([]models.Player, error) {
+	rows, err := c.conn.Query(ctx, `
+	SELECT a.athlete_id, a.first_name, a.last_name, a.position, a.date_of_birth, a.height, a.preferred_foot_or_handness, a.nation, a.current_status, ap.photo_url, nf.flag_url FROM Athletes a 
+	INNER JOIN Athlete_Photos ap ON a.athlete_id=ap.athlete_id 
+	INNER JOIN National_Flags nf ON a.nation=nf.nation 
+	WHERE is_indexed=0;
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	players := make([]models.Player, 0)
+	for rows.Next() {
+		var player models.Player
+		if err := rows.Scan(&player.ID, &player.FirstName, &player.LastName, &player.Position, &player.DateOfBirth, &player.Height, &player.PreferredFoot, &player.Nation.Name, &player.CurrentStatus, &player.URLPhoto, &player.Nation.URLFlag); err != nil {
+			return nil, err
+		}
+		players = append(players, player)
+	}
+
+	return players, nil
+}
+
+func (c *ClichouseDB) GetUnindexedTeams(ctx context.Context) ([]models.Team, error) {
+	rows, err := c.conn.Query(ctx, "SELECT t.team_id, t.name, tl.logo_url FROM Teams t INNER JOIN Team_Logos tl ON t.team_id=tl.team_id WHERE is_indexed=0;")
+	if err != nil {
+		return nil, err
+	}
+
+	teams := make([]models.Team, 0)
+	for rows.Next() {
+		var team models.Team
+		if err := rows.Scan(&team.ID, &team.Name, &team.URLLogo); err != nil {
+			return nil, err
+		}
+		teams = append(teams, team)
+	}
+
+	return teams, nil
+}
+
+func (c *ClichouseDB) GetUnindexedManagers(ctx context.Context) ([]models.Manager, error) {
+	rows, err := c.conn.Query(ctx, "SELECT m.manager_id, m.first_name, last_name, m.nation, mp.photo_url, nf.flag_url FROM Managers m INNER JOIN Manager_Photos mp ON m.manager_id=mp.manager_id INNER JOIN National_Flags nf ON m.nation=nf.nation WHERE is_indexed=0;")
+	if err != nil {
+		return nil, err
+	}
+	managers := make([]models.Manager, 0)
+	for rows.Next() {
+		var manager models.Manager
+		if err := rows.Scan(&manager.ID, &manager.FirstName, &manager.LastName, &manager.Nation.Name, &manager.URLPhoto, &manager.Nation.URLFlag); err != nil {
+			return nil, err
+		}
+		managers = append(managers, manager)
+	}
+	return managers, nil
+}
+
+func (c *ClichouseDB) GetUnindexedTournaments(ctx context.Context) ([]models.Tournament, error) {
+	rows, err := c.conn.Query(ctx, "SELECT t.tournament_id, t.name, t.country, nf.flag_url, t.season, tl.logo_url FROM Tournaments t INNER JOIN National_Flags nf ON t.country=nf.nation INNER JOIN Tournament_Logos tl ON t.name=tl.tournament_name WHERE is_indexed=0;")
+	if err != nil {
+		return nil, err
+	}
+	tournaments := make([]models.Tournament, 0)
+	for rows.Next() {
+		var tournament models.Tournament
+		if err := rows.Scan(&tournament.ID, &tournament.Name, &tournament.Country.Name, &tournament.Country.URLFlag, &tournament.Season, &tournament.URLLogo); err != nil {
+			return nil, err
+		}
+		tournaments = append(tournaments, tournament)
+	}
+	return tournaments, nil
+}
+
+func (c *ClichouseDB) UpdateBatchPlayersIndexedStatus(ctx context.Context, ids []uint32) error {
+	return c.conn.Exec(ctx, "ALTER TABLE Athletes UPDATE is_indexed=1 WHERE athlete_id IN $1", ids)
+}
+
+func (c *ClichouseDB) UpdateBatchManagersIndexedStatus(ctx context.Context, ids []uint32) error {
+	return c.conn.Exec(ctx, "ALTER TABLE Managers UPDATE is_indexed=1 WHERE manager_id IN $1", ids)
+}
+
+func (c *ClichouseDB) UpdateBatchTeamsIndexedStatus(ctx context.Context, ids []uint32) error {
+	return c.conn.Exec(ctx, "ALTER TABLE Teams UPDATE is_indexed=1 WHERE team_id IN $1", ids)
+}
+
+func (c *ClichouseDB) UpdateBatchTournamentsIndexedStatus(ctx context.Context, ids []uint32) error {
+	return c.conn.Exec(ctx, "ALTER TABLE Tournaments UPDATE is_indexed=1 WHERE tournament_id IN $1", ids)
+}

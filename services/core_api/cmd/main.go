@@ -29,7 +29,7 @@ func main() {
 	}
 	log.Println("Connected to Postgres")
 
-	esClient, err := elasticsearch.NewElasticsearch()
+	esClient, err := elasticsearch.NewElasticsearch(clickhouseDB)
 	if err != nil {
 		log.Fatalf("error in connect elasticsearch: %v", err)
 	}
@@ -45,4 +45,3 @@ func main() {
 		log.Fatalf("error in runnig server: %v", err)
 	}
 }
-

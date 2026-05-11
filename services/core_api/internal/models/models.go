@@ -11,7 +11,7 @@ type Player struct {
 	Height        uint16    `json:"height"`
 	PreferredFoot string    `json:"preffered_foot"`
 	Nation        Country   `json:"nation"`
-	CurrentStatus string    `json:"current_status"`
+	CurrentStatus string    `json:"current_status,omitempty"`
 	URLPhoto      string    `json:"url_photo,omitempty"`
 }
 

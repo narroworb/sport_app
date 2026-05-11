@@ -69,3 +69,13 @@ type TransactionDatabaseInterface interface {
 	DeleteFavoriteTeamByID(ctx context.Context, userID int64, teamID int64) error
 	DeleteFavoriteTournamentByID(ctx context.Context, userID int64, tournamentID int64) error
 }
+
+type SearchDatabaseInterface interface {
+	Search(ctx context.Context, query string, entityType string, filters models.SearchFilters) ([]models.SearchResult, error)
+	IndexPlayer(ctx context.Context, player models.Player) error
+	IndexTeam(ctx context.Context, team models.Team) error
+	IndexManager(ctx context.Context, manager models.Manager) error
+	IndexTournament(ctx context.Context, tournament models.Tournament) error
+	DeleteIndex(ctx context.Context, index string) error
+}
+

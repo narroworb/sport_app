@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/narroworb/core_api/internal/database"
+	"github.com/narroworb/core_api/internal/elasticsearch"
 	"github.com/narroworb/core_api/internal/server"
 )
 
@@ -28,13 +29,20 @@ func main() {
 	}
 	log.Println("Connected to Postgres")
 
+	esClient, err := elasticsearch.NewElasticsearch()
+	if err != nil {
+		log.Fatalf("error in connect elasticsearch: %v", err)
+	}
+	log.Println("Connected to Elasticsearch")
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8082"
 	}
-	srv := server.NewServerRepo(clickhouseDB, postgresDB, redis, port)
+	srv := server.NewServerRepo(clickhouseDB, postgresDB, redis, esClient, port)
 
 	if err := srv.Run(); err != nil {
 		log.Fatalf("error in runnig server: %v", err)
 	}
 }
+

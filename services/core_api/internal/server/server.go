@@ -16,7 +16,7 @@ type ServerRepo struct {
 	port      string
 }
 
-func NewServerRepo(adb handlers.AnalyticDatabaseInterface, tdb handlers.TransactionDatabaseInterface, cacheDB handlers.CacheInterface, port string) *ServerRepo {
+func NewServerRepo(adb handlers.AnalyticDatabaseInterface, tdb handlers.TransactionDatabaseInterface, cacheDB handlers.CacheInterface, searchDB handlers.SearchDatabaseInterface, port string) *ServerRepo {
 	analyticsClient, err := analytics.NewClient()
 	if err != nil {
 		// Analytics is optional: core API should still start if analytics service is down.
@@ -29,7 +29,7 @@ func NewServerRepo(adb handlers.AnalyticDatabaseInterface, tdb handlers.Transact
 	}
 
 	return &ServerRepo{
-		handlers:  *handlers.NewHandlerRepo(adb, tdb, cacheDB),
+		handlers:  *handlers.NewHandlerRepo(adb, tdb, cacheDB, searchDB),
 		analytics: analyticsHTTP,
 		port:      port,
 	}

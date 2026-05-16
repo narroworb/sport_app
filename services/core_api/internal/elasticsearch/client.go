@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +19,34 @@ import (
 type Elasticsearch struct {
 	client *elasticsearch.Client
 	db     handlers.AnalyticDatabaseInterface
+}
+
+// Структуры для парсинга результатов Elasticsearch
+type esPlayer struct {
+	ID            uint32 `json:"id"`
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Position      string `json:"position"`
+	Nation        string `json:"nation"`
+	CurrentStatus string `json:"current_status"`
+	Height        uint16 `json:"height"`
+	URLPhoto      string `json:"url_photo"`
+}
+
+type esManager struct {
+	ID        uint32 `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Nation    string `json:"nation"`
+	URLPhoto  string `json:"url_photo"`
+}
+
+type esTournament struct {
+	ID       uint32 `json:"id"`
+	Name     string `json:"name"`
+	Country  string `json:"country"`
+	Season   string `json:"season"`
+	URLLogo  string `json:"url_logo"`
 }
 
 func NewElasticsearch(db handlers.AnalyticDatabaseInterface) (*Elasticsearch, error) {
@@ -204,8 +233,9 @@ func (es *Elasticsearch) Search(ctx context.Context, query string, entityType st
 
 		switch hit.Index {
 		case "players":
-			var player models.Player
+			var player esPlayer
 			if err := json.Unmarshal(hit.Source, &player); err != nil {
+				log.Printf("error in parsing player from esearch %s\n", hit.Source)
 				continue
 			}
 			entity = player
@@ -213,24 +243,33 @@ func (es *Elasticsearch) Search(ctx context.Context, query string, entityType st
 		case "teams":
 			var team models.Team
 			if err := json.Unmarshal(hit.Source, &team); err != nil {
+				log.Printf("error in parsing team from esearch %s\n", hit.Source)
 				continue
 			}
 			entity = team
 			eType = "team"
 		case "managers":
-			var manager models.Manager
+			var manager esManager
 			if err := json.Unmarshal(hit.Source, &manager); err != nil {
+				log.Printf("error in parsing manager from esearch %s\n", hit.Source)
 				continue
 			}
 			entity = manager
 			eType = "manager"
 		case "tournaments":
-			var tournament models.Tournament
+			var tournament esTournament
 			if err := json.Unmarshal(hit.Source, &tournament); err != nil {
+				log.Printf("error in parsing tournament from esearch %s\n", hit.Source)
 				continue
 			}
 			entity = tournament
 			eType = "tournament"
+		default:
+			continue
+		}
+
+		if entity == nil {
+			continue
 		}
 
 		results = append(results, models.SearchResult{

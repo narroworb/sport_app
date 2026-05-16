@@ -25,8 +25,9 @@ func (e *Elasticsearch) RunIndexing(ctx context.Context) error {
 		if len(updatedIDs) > 0 {
 			if err := e.db.UpdateBatchTournamentsIndexedStatus(ctx, updatedIDs); err != nil {
 				log.Printf("Failed to update indexed status for tournaments: %v\n", err)
-			}
+			} else {
 			log.Printf("Indexed %d tournaments\n", len(updatedIDs))
+			}
 		}
 	}
 
@@ -47,8 +48,9 @@ func (e *Elasticsearch) RunIndexing(ctx context.Context) error {
 		if len(updatedIDs) > 0 {
 			if err := e.db.UpdateBatchTeamsIndexedStatus(ctx, updatedIDs); err != nil {
 				log.Printf("Failed to update indexed status for teams: %v\n", err)
-			}
+			} else {
 			log.Printf("Indexed %d teams\n", len(updatedIDs))
+			}
 		}
 	}
 
@@ -71,6 +73,7 @@ func (e *Elasticsearch) RunIndexing(ctx context.Context) error {
 				log.Printf("Failed to update indexed status for managers: %v\n", err)
 			} else {
 			log.Printf("Indexed %d managers\n", len(updatedIDs))
+		}
 		}
 	}
 

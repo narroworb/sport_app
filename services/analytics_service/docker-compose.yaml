@@ -19,10 +19,10 @@ services:
     ports:
       - "50051:50051"
     networks:
-      - data_collector_default
+      - sport_network
 
 networks:
-  data_collector_default:
+  sport_network:
     external: true
-    name: data_collector_default
+    name: sport_network
 

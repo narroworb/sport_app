@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS user_favorite_tournaments (
     id SERIAL PRIMARY KEY,
     tournament_id INT NOT NULL,
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(tournaments_id, user_id)
+    UNIQUE(tournament_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS user_favorite_managers (

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Match - Sports Analytics</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <h2><a href="/" style="text-decoration:none; color:#2c3e50;">⚽ Sports Analytics</a></h2>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/search.html" class="nav-link">Search</a>
+                <div class="auth-section">
+                    <span id="user-name" style="display:none; margin-right: 15px;"></span>
+                    <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Login</button>
+                    <button id="logout-btn" class="btn-secondary" style="display:none;" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div id="auth-panel" class="auth-panel" style="display:none;">
+        <div class="auth-container">
+            <div class="close-btn" onclick="toggleAuthPanel()">✕</div>
+            <div class="auth-tabs">
+                <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+                <button class="tab-btn" onclick="switchTab('register')">Register</button>
+            </div>
+            
+            <form id="login-form" class="tab-content active">
+                <input type="text" id="login-username" placeholder="Username" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit" class="btn-primary">Login</button>
+                <div id="login-error" class="error-msg"></div>
+            </form>
+
+            <form id="register-form" class="tab-content">
+                <input type="text" id="register-username" placeholder="Username" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <input type="password" id="register-password-confirm" placeholder="Confirm Password" required>
+                <button type="submit" class="btn-primary">Register</button>
+                <div id="register-error" class="error-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <main class="container">
+        <div id="match-detail" class="detail-container">
+            <div class="detail-header">
+                <div class="detail-title" style="text-align: center; width: 100%;">
+                    <div style="margin-bottom: 1rem;">
+                        <span id="match-date" style="color: #7f8c8d; font-size: 1rem;">Loading...</span>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 2rem; align-items: center; margin-bottom: 1rem;">
+                        <div style="text-align: center;">
+                            <h2 id="home-team" onclick="goToTeam(this.dataset.id)" style="cursor: pointer;">Home</h2>
+                        </div>
+                        <div style="font-size: 2rem; font-weight: bold;">
+                            <span id="match-score">- : -</span>
+                        </div>
+                        <div style="text-align: center;">
+                            <h2 id="away-team" onclick="goToTeam(this.dataset.id)" style="cursor: pointer;">Away</h2>
+                        </div>
+                    </div>
+                    <div class="detail-meta" style="justify-content: center;">
+                        <span id="match-status" class="badge status">Scheduled</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchMatchTab('overview')">Overview</button>
+                <button class="tab" onclick="switchMatchTab('players')">Players</button>
+                <button class="tab" onclick="switchMatchTab('goalies')">Goalies</button>
+                <button class="tab" onclick="switchMatchTab('team-stats')">Team Stats</button>
+            </div>
+
+            <div id="match-overview" class="tab-pane active">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h3 id="home-team-name-header"></h3>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div class="stat-value" id="home-shots">-</div>
+                                <div class="stat-label">Shots</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="home-possession">-</div>
+                                <div class="stat-label">Possession</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 id="away-team-name-header"></h3>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div class="stat-value" id="away-shots">-</div>
+                                <div class="stat-label">Shots</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="away-possession">-</div>
+                                <div class="stat-label">Possession</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="match-players" class="tab-pane">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h3>Home Players</h3>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Player</th>
+                                    <th>Goals</th>
+                                    <th>Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody id="home-players-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <h3>Away Players</h3>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Player</th>
+                                    <th>Goals</th>
+                                    <th>Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody id="away-players-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="match-goalies" class="tab-pane">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h3>Home Goalies</h3>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Goalie</th>
+                                    <th>Saves</th>
+                                    <th>Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody id="home-goalies-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <h3>Away Goalies</h3>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Goalie</th>
+                                    <th>Saves</th>
+                                    <th>Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody id="away-goalies-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="match-team-stats" class="tab-pane">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Stat</th>
+                            <th>Home</th>
+                            <th>Away</th>
+                        </tr>
+                    </thead>
+                    <tbody id="team-stats-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Sports Analytics. All rights reserved.</p>
+    </footer>
+
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+    <script src="match.js"></script>
+</body>
+</html>

@@ -2157,7 +2157,7 @@ func (c *ClichouseDB) GetManagerFixtures(ctx context.Context, id, limit, offset 
 func (c *ClichouseDB) GetMatchesByDate(ctx context.Context, date time.Time) ([]models.Match, error) {
 	rows, err := c.conn.Query(ctx, `
 	SELECT 
-	ht.team_id, ht.name, htl.logo_url, at.team_id, at.name, atl.logo_url, date, round, t.name, tl.logo_url, home_score, away_score, status FROM Matches m
+	m.match_id, ht.team_id, ht.name, htl.logo_url, at.team_id, at.name, atl.logo_url, date, round, t.name, tl.logo_url, home_score, away_score, status FROM Matches m
 	INNER JOIN Teams ht ON ht.team_id=m.home_team_id
 	INNER JOIN Team_Logos htl ON ht.team_id=htl.team_id
 	INNER JOIN Teams at ON at.team_id=m.away_team_id
@@ -2176,7 +2176,7 @@ func (c *ClichouseDB) GetMatchesByDate(ctx context.Context, date time.Time) ([]m
 
 	for rows.Next() {
 		var match models.Match
-		if err := rows.Scan(&match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo, &match.Date, &match.Round, &match.Tournament.Name, &match.Tournament.URLLogo,
+		if err := rows.Scan(&match.ID, &match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo, &match.Date, &match.Round, &match.Tournament.Name, &match.Tournament.URLLogo,
 			&match.HomeGoals, &match.AwayGoals, &match.Status); err != nil {
 			return nil, err
 		}

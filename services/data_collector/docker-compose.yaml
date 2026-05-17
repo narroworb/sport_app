@@ -15,6 +15,8 @@ services:
     ports:
       - "9000:9000"
       - "8123:8123"
+    networks:
+      - sport_network
     cap_add:
       - SYS_NICE
       - NET_ADMIN
@@ -34,6 +36,8 @@ services:
     restart: always
     ports:
       - "8090:8090"
+    networks:
+      - sport_network
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -46,6 +50,8 @@ services:
     volumes:
       - zk_data:/var/lib/zookeeper/data
       - zk_logs:/var/lib/zookeeper/log
+    networks:
+      - sport_network
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -54,6 +60,8 @@ services:
       - zookeeper
     ports:
       - "9092:9092"
+    networks:
+      - sport_network
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -72,7 +80,22 @@ services:
 
 volumes:
   ch_data:
+    external: true
+    name: ch_data
   ch_logs:
+    external: true
+    name: ch_logs
   zk_data:
+    external: true
+    name: zk_data
   zk_logs:
+    external: true
+    name: zk_logs
   kafka_data:
+    external: true
+    name: kafka_data
+
+networks:
+  sport_network:
+    external: true
+    name: sport_network

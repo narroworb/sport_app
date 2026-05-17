@@ -1,6 +1,10 @@
 // Player page functionality
 let playerId;
 let isFavorite = false;
+let currentStats = null;
+let currentTeams = null;
+let currentFixtures = null;
+let availableSeasons = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkAuth();
@@ -18,19 +22,138 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('login-form').addEventListener('submit', handleLogin);
     document.getElementById('register-form').addEventListener('submit', handleRegister);
+    
+    // Навешиваем обработчики на фильтры
+    document.getElementById('apply-filters').addEventListener('click', applyFilters);
+    document.getElementById('reset-filters').addEventListener('click', resetFilters);
 });
+
+async function loadPlayerStatsWithFilters(season, dateFrom, dateTo) {
+    let url = `/api/player/${playerId}/stats`;
+    const params = [];
+    
+    if (season) {
+        params.push(`season=${encodeURIComponent(season)}`);
+    } else {
+        if (dateFrom) params.push(`dateFrom=${dateFrom}`);
+        if (dateTo) params.push(`dateTo=${dateTo}`);
+    }
+    
+    if (params.length > 0) {
+        url += `?${params.join('&')}`;
+    }
+    
+    console.log('Fetching stats from:', url);
+    const response = await fetch(url);
+    if (response.ok) {
+        return await response.json();
+    }
+    return null;
+}
+
+async function applyFilters() {
+    const seasonFilter = document.getElementById('season-filter').value;
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
+    
+    // Если выбран сезон, игнорируем даты
+    const stats = await loadPlayerStatsWithFilters(seasonFilter || null, dateFrom, dateTo);
+    
+    if (stats) {
+        currentStats = stats;
+        updateStatsGrid(stats);
+    } else {
+        console.error('Failed to load filtered stats');
+        document.getElementById('player-stats-grid').innerHTML = '<p>No stats available for selected period</p>';
+    }
+}
+
+function resetFilters() {
+    document.getElementById('season-filter').value = '';
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+    
+    // Перезагружаем полную статистику
+    loadPlayerStatsWithFilters(null, null, null).then(stats => {
+        if (stats) {
+            currentStats = stats;
+            updateStatsGrid(stats);
+        }
+    });
+}
+
+function updateStatsGrid(stats) {
+    const statsGrid = document.getElementById('player-stats-grid');
+    const statsToShow = [
+        { key: 'total_matches', label: 'Matches', isPercent: false },
+        { key: 'goals', label: 'Goals', isPercent: false },
+        { key: 'assists', label: 'Assists', isPercent: false },
+        { key: 'avg_rating', label: 'Avg Rating', isPercent: false },
+        { key: 'minutes_played', label: 'Minutes', isPercent: false },
+        { key: 'yellow_cards', label: 'Yellow Cards', isPercent: false },
+        { key: 'red_cards', label: 'Red Cards', isPercent: false },
+        { key: 'total_tackles', label: 'Tackles', isPercent: false },
+        { key: 'interceptions', label: 'Interceptions', isPercent: false },
+        { key: 'saves', label: 'Saves', isPercent: false },
+        { key: 'pass_accuracy', label: 'Pass Accuracy', isPercent: true },
+        { key: 'dribble_accuracy', label: 'Dribble Accuracy', isPercent: true }
+    ];
+    
+    const passAccuracy = stats.complete_passes && stats.pass_attempts 
+        ? (stats.complete_passes / stats.pass_attempts) * 100 
+        : null;
+    
+    const displayStats = [];
+    for (const stat of statsToShow) {
+        let value = stats[stat.key];
+        if (stat.key === 'pass_accuracy' && passAccuracy !== null) {
+            value = passAccuracy;
+        }
+        if (value !== undefined && value !== null) {
+            let displayValue = value;
+            if (typeof value === 'number') {
+                if (stat.isPercent || stat.key.includes('accuracy') || stat.key.includes('percent')) {
+                    displayValue = value.toFixed(1) + '%';
+                } else if (Number.isInteger(value)) {
+                    displayValue = value;
+                } else {
+                    displayValue = value.toFixed(2);
+                }
+            }
+            displayStats.push({ label: stat.label, value: displayValue });
+        }
+    }
+    
+    if (stats.goals && stats.minutes_played && stats.minutes_played > 0) {
+        const goalsPer90 = (stats.goals / stats.minutes_played) * 90;
+        displayStats.push({ label: 'Goals/90', value: goalsPer90.toFixed(2) });
+    }
+    
+    if (stats.saves && stats.minutes_played && stats.minutes_played > 0) {
+        const savesPer90 = (stats.saves / stats.minutes_played) * 90;
+        displayStats.push({ label: 'Saves/90', value: savesPer90.toFixed(2) });
+    }
+    
+    if (displayStats.length > 0) {
+        statsGrid.innerHTML = displayStats.map(stat => `
+            <div class="stat-box">
+                <div class="stat-value">${stat.value}</div>
+                <div class="stat-label">${stat.label}</div>
+            </div>
+        `).join('');
+    } else {
+        statsGrid.innerHTML = '<p>No stats available</p>';
+    }
+}
 
 async function loadPlayerData() {
     try {
         console.log('Loading player data for ID:', playerId);
         
-        const [details, stats, teams, fixtures] = await Promise.all([
+        // Сначала загружаем базовую информацию и статистику по сезонам
+        const [details, teams, fixtures] = await Promise.all([
             playerAPI.getDetails(playerId).catch(e => {
                 console.error('Details error:', e);
-                return null;
-            }),
-            playerAPI.getStats(playerId).catch(e => {
-                console.error('Stats error:', e);
                 return null;
             }),
             playerAPI.getTeams(playerId).catch(e => {
@@ -44,7 +167,6 @@ async function loadPlayerData() {
         ]);
 
         console.log('Player details:', details);
-        console.log('Player stats:', stats);
         console.log('Player teams:', teams);
         console.log('Player fixtures:', fixtures);
 
@@ -53,26 +175,40 @@ async function loadPlayerData() {
             return;
         }
 
-        // Загружаем похожих игроков
-        let similarPlayers = null;
-        let season = null;
-        
-        // Определяем сезон
-        const currentYear = new Date().getFullYear();
-        const currentMonth = new Date().getMonth();
-        if (currentMonth >= 6) {
-            season = `${currentYear}/${currentYear + 1}`;
-        } else {
-            season = `${currentYear - 1}/${currentYear}`;
-        }
-        
-        // Пробуем получить сезон из команд игрока
-        if (teams && Array.isArray(teams) && teams.length > 0) {
-            const firstTeam = teams[0];
-            if (firstTeam.season) {
-                season = firstTeam.season;
+        currentTeams = teams;
+        currentFixtures = fixtures;
+
+        // Собираем доступные сезоны из команд
+        if (teams && Array.isArray(teams)) {
+            const seasonsSet = new Set();
+            teams.forEach(team => {
+                if (team.season) {
+                    seasonsSet.add(team.season);
+                }
+            });
+            availableSeasons = Array.from(seasonsSet).sort().reverse();
+            
+            const seasonFilter = document.getElementById('season-filter');
+            if (seasonFilter) {
+                availableSeasons.forEach(season => {
+                    const option = document.createElement('option');
+                    option.value = season;
+                    option.textContent = season;
+                    seasonFilter.appendChild(option);
+                });
             }
         }
+
+        // Загружаем статистику (без фильтров сначала)
+        const stats = await loadPlayerStatsWithFilters(null, null, null);
+        if (stats) {
+            currentStats = stats;
+            updateStatsGrid(stats);
+        }
+
+        // Загружаем похожих игроков
+        let similarPlayers = null;
+        let season = availableSeasons[0] || getCurrentSeason();
         
         try {
             const similarUrl = `/api/analytics/player_similarity?player_id=${playerId}&season=${encodeURIComponent(season)}&top_k=5&min_minutes=100`;
@@ -81,8 +217,6 @@ async function loadPlayerData() {
             if (similarResponse.ok) {
                 similarPlayers = await similarResponse.json();
                 console.log('Similar players:', similarPlayers);
-            } else {
-                console.error('Similar players response not OK:', similarResponse.status);
             }
         } catch (e) {
             console.error('Error loading similar players:', e);
@@ -110,81 +244,15 @@ async function loadPlayerData() {
             nationSpan.innerHTML = `${nationFlag ? `<img src="${nationFlag}" style="width: 20px; vertical-align: middle; margin-right: 5px;">` : '🌍'} ${nationName}`;
         }
 
-        // Stats grid with rounded values
-        if (stats) {
-            const statsGrid = document.getElementById('player-stats-grid');
-            const statsToShow = [
-                { key: 'total_matches', label: 'Matches', isPercent: false },
-                { key: 'goals', label: 'Goals', isPercent: false },
-                { key: 'assists', label: 'Assists', isPercent: false },
-                { key: 'avg_rating', label: 'Avg Rating', isPercent: false },
-                { key: 'minutes_played', label: 'Minutes', isPercent: false },
-                { key: 'yellow_cards', label: 'Yellow Cards', isPercent: false },
-                { key: 'red_cards', label: 'Red Cards', isPercent: false },
-                { key: 'total_tackles', label: 'Tackles', isPercent: false },
-                { key: 'interceptions', label: 'Interceptions', isPercent: false },
-                { key: 'pass_accuracy', label: 'Pass Accuracy', isPercent: true },
-                { key: 'dribble_accuracy', label: 'Dribble Accuracy', isPercent: true }
-            ];
-            
-            const passAccuracy = stats.complete_passes && stats.pass_attempts 
-                ? (stats.complete_passes / stats.pass_attempts) * 100 
-                : null;
-            
-            const displayStats = [];
-            for (const stat of statsToShow) {
-                let value = stats[stat.key];
-                if (stat.key === 'pass_accuracy' && passAccuracy !== null) {
-                    value = passAccuracy;
-                }
-                if (value !== undefined && value !== null) {
-                    let displayValue = value;
-                    if (typeof value === 'number') {
-                        if (stat.isPercent || stat.key.includes('accuracy') || stat.key.includes('percent')) {
-                            displayValue = value.toFixed(1) + '%';
-                        } else if (Number.isInteger(value)) {
-                            displayValue = value;
-                        } else {
-                            displayValue = value.toFixed(2);
-                        }
-                    }
-                    displayStats.push({ label: stat.label, value: displayValue });
-                }
-            }
-            
-            if (stats.goals && stats.minutes_played) {
-                const goalsPer90 = (stats.goals / stats.minutes_played) * 90;
-                displayStats.push({ label: 'Goals/90', value: goalsPer90.toFixed(2) });
-            }
-            
-            if (displayStats.length > 0) {
-                statsGrid.innerHTML = displayStats.map(stat => `
-                    <div class="stat-box">
-                        <div class="stat-value">${stat.value}</div>
-                        <div class="stat-label">${stat.label}</div>
-                    </div>
-                `).join('');
-            } else {
-                statsGrid.innerHTML = '<p>No stats available</p>';
-            }
-        }
-
         // Добавляем блок похожих игроков
         if (similarPlayers && similarPlayers.players && similarPlayers.players.length > 0) {
             console.log('Adding similar players block...');
             
-            // Загружаем детали похожих игроков
             const similarPlayersDetails = [];
             for (const similar of similarPlayers.players.slice(0, 5)) {
-                const similarDetail = await playerAPI.getDetails(similar.player_id).catch(e => {
-                    console.error(`Error loading similar player ${similar.player_id}:`, e);
-                    return null;
-                });
+                const similarDetail = await playerAPI.getDetails(similar.player_id).catch(e => null);
                 if (similarDetail) {
-                    similarPlayersDetails.push({
-                        ...similar,
-                        details: similarDetail
-                    });
+                    similarPlayersDetails.push({ ...similar, details: similarDetail });
                 }
             }
             
@@ -200,7 +268,6 @@ async function loadPlayerData() {
                             const positionNames = { 'G': 'Goalkeeper', 'D': 'Defender', 'M': 'Midfielder', 'F': 'Forward' };
                             const positionDisplay = positionNames[playerPosition] || playerPosition;
                             
-                            // Определяем цвет similarity
                             let similarityColor = '#e74c3c';
                             if (similarityPercent >= 70) similarityColor = '#2ecc71';
                             else if (similarityPercent >= 50) similarityColor = '#f39c12';
@@ -234,14 +301,10 @@ async function loadPlayerData() {
                 </div>
             `;
             
-            // Добавляем блок после stats-grid
             const statsGrid = document.getElementById('player-stats-grid');
             if (statsGrid && !document.getElementById('player-similarity')) {
                 statsGrid.insertAdjacentHTML('afterend', similarityHtml);
-                console.log('Similar players block added successfully');
             }
-        } else {
-            console.log('No similar players data available');
         }
 
         // Teams
@@ -257,8 +320,6 @@ async function loadPlayerData() {
                     <td>${team.position || team.role || 'N/A'}</td>
                 </tr>
             `).join('');
-        } else {
-            document.getElementById('teams-tbody').innerHTML = '<tr><td colspan="3">No team history available</td></tr>';
         }
 
         // Fixtures
@@ -303,12 +364,6 @@ async function loadPlayerData() {
                     </div>
                 `;
             }).join('');
-            
-            if (fixtures.length === 0) {
-                list.innerHTML = '<p>No fixtures available</p>';
-            }
-        } else {
-            document.getElementById('fixtures-list').innerHTML = '<p>No fixtures available</p>';
         }
         
         // Проверяем избранное
@@ -330,6 +385,16 @@ async function loadPlayerData() {
     } catch (error) {
         console.error('Error loading player data:', error);
         document.getElementById('player-detail').innerHTML = '<p class="loading">Error loading player data. Please try again.</p>';
+    }
+}
+
+function getCurrentSeason() {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth();
+    if (currentMonth >= 6) {
+        return `${currentYear}/${currentYear + 1}`;
+    } else {
+        return `${currentYear - 1}/${currentYear}`;
     }
 }
 
@@ -370,13 +435,6 @@ async function toggleFavorite() {
     } catch (error) {
         console.error('Error toggling favorite:', error);
     }
-}
-
-function formatLabel(key) {
-    return key.replace(/_/g, ' ')
-              .split(' ')
-              .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-              .join(' ');
 }
 
 function goToMatch(id) {

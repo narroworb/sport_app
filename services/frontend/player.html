@@ -64,6 +64,32 @@
                 </div>
             </div>
 
+            <!-- Фильтры статистики -->
+            <div class="stats-filters" style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                <h4 style="margin-bottom: 0.5rem;">📊 Filter Statistics</h4>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                    <div style="flex: 1; min-width: 150px;">
+                        <label>Filter by Season:</label>
+                        <select id="season-filter" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                            <option value="">All Seasons</option>
+                        </select>
+                    </div>
+                    <div style="text-align: center; padding-top: 0.5rem;">OR</div>
+                    <div style="flex: 1; min-width: 150px;">
+                        <label>Date From:</label>
+                        <input type="date" id="date-from" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                    </div>
+                    <div style="flex: 1; min-width: 150px;">
+                        <label>Date To:</label>
+                        <input type="date" id="date-to" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                    </div>
+                    <div>
+                        <button id="apply-filters" class="btn-primary" style="padding: 0.5rem 1rem;">Apply Filters</button>
+                        <button id="reset-filters" class="btn-secondary" style="padding: 0.5rem 1rem;">Reset</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="stats-grid" id="player-stats-grid"></div>
 
             <div class="tabs">

@@ -68,6 +68,7 @@
                 <button class="tab" onclick="switchTournamentTab('teams-stats')">Teams Stats</button>
                 <button class="tab" onclick="switchTournamentTab('players-stats')">Players Stats</button>
                 <button class="tab" onclick="switchTournamentTab('fixtures')">Fixtures</button>
+                <button class="tab" onclick="switchTournamentTab('history')">📈 Position History</button>
             </div>
 
             <div id="tournament-table" class="tab-pane active">
@@ -120,6 +121,23 @@
 
             <div id="tournament-fixtures" class="tab-pane">
                 <div id="fixtures-list"></div>
+            </div>
+
+            <div id="tournament-history" class="tab-pane">
+                <div class="history-controls" style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <label>
+                        Select Teams:
+                        <select id="team-selector" multiple style="min-width: 200px; padding: 0.5rem;">
+                            <option value="all">All Teams</option>
+                        </select>
+                    </label>
+                    <button onclick="updatePositionChart()" class="btn-primary">Update Chart</button>
+                    <button onclick="resetChartSelection()" class="btn-secondary">Reset</button>
+                </div>
+                <canvas id="position-chart" style="width: 100%; height: 400px;"></canvas>
+                <div style="margin-top: 1rem; font-size: 0.8rem; color: #666; text-align: center;">
+                    📊 Shows team position changes throughout the tournament by round
+                </div>
             </div>
         </div>
     </main>

@@ -2,7 +2,9 @@ package collector
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -17,10 +19,12 @@ type DatabaseInterface interface {
 	GetUnactualTournamentsAndTours(context.Context) ([]UnactualTournamentsAndTours, error)
 	GetFootballTournamentID(ctx context.Context, name, season string) (uint32, error)
 	GetFootballTeamID(ctx context.Context, name string) (uint32, error)
+	GetFootballTeamIDByAlternativeName(ctx context.Context, name string) (uint32, error)
 	GetFootballManagerID(ctx context.Context, manager *models.Manager) (uint32, error)
 	GetFootballMatchID(ctx context.Context, match *models.Match, tournamentID uint32) (uint32, error)
 	GetFootballMatchStatus(ctx context.Context, matchID uint32) (string, error)
 	GetFootballPlayerID(ctx context.Context, name string, dateOfBirth time.Time) (uint32, error)
+	GetFootballPlayerIDByAlternativeSearch(ctx context.Context, name string, dateOfBirth time.Time, position string, country string, height uint16) (uint32, error)
 	GetFootballMatchStats(ctx context.Context, stats models.TeamMatchStats, matchID uint32) (uint32, error)
 	GetFootballPlayerMatchStats(ctx context.Context, stats models.PlayerStatsInMatch, matchID uint32) (uint32, error)
 	GetFootballGoalieMatchStats(ctx context.Context, stats models.GoalieStatsInMatch, matchID uint32) (uint32, error)
@@ -99,7 +103,7 @@ func (u *Updater) StartUpdate() {
 	}
 
 	if len(dataToCollect) == 0 {
-		log.Println("there is nothing to update wits stats, end of operation!")
+		log.Println("there is nothing to update with stats, end of operation!")
 		return
 	}
 
@@ -122,11 +126,12 @@ func (u *Updater) StartUpdate() {
 
 	for i := 0; i < maxWorkers; i++ {
 		go func() {
-			workerCtx, _ := chromedp.NewContext(u.api.(*ApiClient).browserCtx)
+			workerCtx, cancel := chromedp.NewContext(u.api.(*ApiClient).browserCtx)
 			for task := range tasks {
 				task(workerCtx)
 				wg.Done()
 			}
+			cancel()
 		}()
 	}
 
@@ -174,6 +179,9 @@ func (u *Updater) StartUpdate() {
 
 			for _, row := range r.Standings[0].Rows {
 				teamID, err := u.db.GetFootballTeamID(ctx, row.Team.Name)
+				if errors.Is(err, sql.ErrNoRows) {
+					teamID, err = u.db.GetFootballTeamIDByAlternativeName(ctx, row.Team.Name)
+				}
 				if err != nil {
 					log.Printf("error in get team %s from db: %v\n", row.Team.Name, err)
 					return
@@ -294,8 +302,7 @@ func (u *Updater) StartUpdate() {
 	}
 	close(tasks)
 	wg.Wait()
-	chromedp.Cancel(u.api.(*ApiClient).browserCtx)
-	log.Println("update done succesfully")
+	log.Println("update with stats done succesfully")
 }
 
 func (u *Updater) StartUpdateWithoutStatistics() {
@@ -327,12 +334,13 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 
 	for i := 0; i < maxWorkers; i++ {
 		go func() {
-			workerCtx, _ := chromedp.NewContext(u.api.(*ApiClient).browserCtx)
-
+			workerCtx, cancel := chromedp.NewContext(u.api.(*ApiClient).browserCtx)
 			for task := range tasks {
 				task(workerCtx)
 				wg.Done()
+				time.Sleep(5 * time.Second)
 			}
+			cancel()
 		}()
 	}
 
@@ -380,6 +388,9 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 
 			for _, row := range r.Standings[0].Rows {
 				teamID, err := u.db.GetFootballTeamID(ctx, row.Team.Name)
+				if errors.Is(err, sql.ErrNoRows) {
+					teamID, err = u.db.GetFootballTeamIDByAlternativeName(ctx, row.Team.Name)
+				}
 				if err != nil {
 					log.Printf("error in get team %s from db: %v\n", row.Team.Name, err)
 					return
@@ -484,7 +495,6 @@ func (u *Updater) StartUpdateWithoutStatistics() {
 	}
 	close(tasks)
 	wg.Wait()
-	chromedp.Cancel(u.api.(*ApiClient).browserCtx)
 	log.Println("update without statistics done succesfully")
 }
 
@@ -998,6 +1008,9 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 
 	for _, p := range resp.HomeTeam.Players {
 		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, time.Unix(p.Player.DateOfBirthTimeStamp, 0))
+		if errors.Is(err, sql.ErrNoRows) {
+			id, err = u.db.GetFootballPlayerIDByAlternativeSearch(ctx, p.Player.Name, time.Unix(p.Player.DateOfBirthTimeStamp, 0), p.Player.Position, p.Player.Country.Name, p.Player.Height)
+		}
 		if err != nil || id == 0 {
 			player, err := u.fetchPlayer(ctx, p.Player.ID)
 			if err != nil {
@@ -1076,6 +1089,9 @@ func (u *Updater) pSResponseToPSStructs(ctx context.Context, resp PlayerStatsRes
 
 	for _, p := range resp.AwayTeam.Players {
 		id, err := u.db.GetFootballPlayerID(ctx, p.Player.Name, time.Unix(p.Player.DateOfBirthTimeStamp, 0))
+		if errors.Is(err, sql.ErrNoRows) {
+			id, err = u.db.GetFootballPlayerIDByAlternativeSearch(ctx, p.Player.Name, time.Unix(p.Player.DateOfBirthTimeStamp, 0), p.Player.Position, p.Player.Country.Name, p.Player.Height)
+		}
 		if err != nil || id == 0 {
 			player, err := u.fetchPlayer(ctx, p.Player.ID)
 			if err != nil {

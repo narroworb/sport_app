@@ -1,5 +1,7 @@
 // Tournament page functionality
 let tournamentId;
+let positionHistoryData = null;
+let positionChart = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkAuth();
@@ -23,7 +25,7 @@ async function loadTournamentData() {
     try {
         console.log('Loading tournament data for ID:', tournamentId);
         
-        const [details, table, teamsStats, playersStats, fixtures] = await Promise.all([
+        const [details, table, teamsStats, playersStats, fixtures, positionHistory] = await Promise.all([
             tournamentAPI.getDetails(tournamentId).catch(e => {
                 console.error('Details error:', e);
                 return null;
@@ -44,6 +46,10 @@ async function loadTournamentData() {
                 console.error('Fixtures error:', e);
                 return null;
             }),
+            tournamentAPI.getTableGraph(tournamentId).catch(e => {
+                console.error('Position history error:', e);
+                return null;
+            }),
         ]);
 
         console.log('Tournament details:', details);
@@ -51,11 +57,15 @@ async function loadTournamentData() {
         console.log('Teams stats:', teamsStats);
         console.log('Players stats:', playersStats);
         console.log('Fixtures:', fixtures);
+        console.log('Position history:', positionHistory);
 
         if (!details) {
             document.getElementById('tournament-detail').innerHTML = '<p class="loading">Tournament not found</p>';
             return;
         }
+
+        // Сохраняем данные истории позиций
+        positionHistoryData = positionHistory;
 
         // Update header with logo
         const tournamentName = details.name || 'Tournament';
@@ -107,7 +117,6 @@ async function loadTournamentData() {
         // Teams Stats (статистика команд)
         if (teamsStats && Array.isArray(teamsStats)) {
             const tbody = document.getElementById('teams-stats-tbody');
-            // Получаем детали команд для логотипов
             const teamDetailsMap = new Map();
             for (const stat of teamsStats.slice(0, 10)) {
                 const teamDetail = await teamAPI.getDetails(stat.team_id).catch(() => null);
@@ -139,15 +148,13 @@ async function loadTournamentData() {
                 `;
             }).join('');
         } else {
-            document.getElementById('teams-stats-tbody').innerHTML = '<td><td colspan="6">No team stats available</td></tr>';
+            document.getElementById('teams-stats-tbody').innerHTML = '<tr><td colspan="6">No team stats available</td></tr>';
         }
 
         // Players Stats (статистика игроков)
         if (playersStats && Array.isArray(playersStats)) {
             const tbody = document.getElementById('players-stats-tbody');
-            // Получаем детали игроков и команд
             const playerDetailsMap = new Map();
-            const teamNamesMap = new Map();
             
             for (const stat of playersStats.slice(0, 20)) {
                 const playerDetail = await playerAPI.getDetails(stat.athlete_id).catch(() => null);
@@ -188,7 +195,6 @@ async function loadTournamentData() {
         // Fixtures (матчи турнира)
         if (fixtures && typeof fixtures === 'object') {
             const list = document.getElementById('fixtures-list');
-            // fixtures приходит в виде { "1": [...], "2": [...], ... } по турам
             const allMatches = [];
             for (const round in fixtures) {
                 if (Array.isArray(fixtures[round])) {
@@ -197,7 +203,6 @@ async function loadTournamentData() {
                     });
                 }
             }
-            // Сортируем по дате
             allMatches.sort((a, b) => new Date(a.date) - new Date(b.date));
             
             list.innerHTML = allMatches.slice(0, 50).map(match => {
@@ -252,6 +257,23 @@ async function loadTournamentData() {
         } else {
             document.getElementById('fixtures-list').innerHTML = '<p>No fixtures available</p>';
         }
+
+        // Инициализируем график истории позиций
+        if (positionHistoryData && Array.isArray(positionHistoryData) && positionHistoryData.length > 0) {
+            console.log('Initializing position chart with data:', positionHistoryData);
+            initPositionChart(positionHistoryData);
+        } else {
+            console.log('No position history data available');
+            const historyDiv = document.getElementById('tournament-history');
+            if (historyDiv) {
+                const noDataMsg = document.createElement('div');
+                noDataMsg.style.textAlign = 'center';
+                noDataMsg.style.padding = '2rem';
+                noDataMsg.style.color = '#666';
+                noDataMsg.innerHTML = '<p>No position history data available for this tournament.</p>';
+                historyDiv.appendChild(noDataMsg);
+            }
+        }
         
         // Проверяем избранное
         if (TokenManager.hasToken()) {
@@ -275,6 +297,224 @@ async function loadTournamentData() {
     }
 }
 
+function initPositionChart(historyData) {
+    console.log('initPositionChart called with historyData length:', historyData.length);
+    
+    // Подготавливаем данные для графика
+    const rounds = historyData.map((_, index) => `Round ${index + 1}`);
+    console.log('Rounds:', rounds);
+    
+    // Собираем все команды и их позиции по турам
+    const teamsMap = new Map();
+    
+    historyData.forEach((roundData, roundIndex) => {
+        roundData.forEach(teamEntry => {
+            const teamId = teamEntry.team.team_id;
+            const teamName = teamEntry.team.name;
+            const teamLogo = teamEntry.team.url_logo;
+            const position = teamEntry.position;
+            
+            if (!teamsMap.has(teamId)) {
+                teamsMap.set(teamId, {
+                    id: teamId,
+                    name: teamName,
+                    logo: teamLogo,
+                    positions: new Array(historyData.length).fill(null)
+                });
+            }
+            const team = teamsMap.get(teamId);
+            team.positions[roundIndex] = position;
+        });
+    });
+    
+    console.log('Teams found:', teamsMap.size);
+    const teams = Array.from(teamsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Заполняем селектор выбора команд
+    const teamSelector = document.getElementById('team-selector');
+    if (teamSelector) {
+        teamSelector.innerHTML = '<option value="all">📊 Show All Teams</option>';
+        teams.forEach(team => {
+            const option = document.createElement('option');
+            option.value = team.name;
+            option.textContent = team.name;
+            teamSelector.appendChild(option);
+        });
+    }
+    
+    // Сохраняем данные для глобального доступа
+    window.positionChartData = {
+        rounds: rounds,
+        teams: teams
+    };
+    
+    console.log('Chart data prepared, teams count:', teams.length);
+    
+    // Создаем график со всеми командами
+    updatePositionChart();
+}
+
+function updatePositionChart() {
+    console.log('updatePositionChart called');
+    
+    if (!window.positionChartData) {
+        console.log('No positionChartData');
+        return;
+    }
+    
+    const teamSelector = document.getElementById('team-selector');
+    if (!teamSelector) {
+        console.log('team-selector not found');
+        return;
+    }
+    
+    const selectedValues = Array.from(teamSelector.selectedOptions).map(opt => opt.value);
+    const showAll = selectedValues.includes('all') || selectedValues.length === 0;
+    
+    // Фильтруем команды
+    let teamsToShow = window.positionChartData.teams;
+    if (!showAll) {
+        teamsToShow = window.positionChartData.teams.filter(team => 
+            selectedValues.includes(team.name)
+        );
+    }
+    
+    console.log('Teams to show:', teamsToShow.length);
+    
+    // Подготавливаем данные для Chart.js
+    const datasets = teamsToShow.map(team => {
+        // Генерируем стабильный цвет для команды
+        const hue = (team.name.length * 37) % 360;
+        const color = `hsl(${hue}, 70%, 55%)`;
+        
+        // Фильтруем null значения (команда не играла в этом туре)
+        const data = team.positions.map(pos => pos);
+        
+        return {
+            label: team.name,
+            data: data,
+            borderColor: color,
+            backgroundColor: color.replace('55%', '15%'),
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            fill: false,
+            tension: 0.1
+        };
+    });
+    
+    if (datasets.length === 0) {
+        console.log('No datasets to show');
+        return;
+    }
+    
+    // Если нет Chart.js, загружаем его
+    if (typeof Chart === 'undefined') {
+        console.log('Loading Chart.js...');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        script.onload = () => {
+            console.log('Chart.js loaded, creating chart...');
+            createChart(datasets);
+        };
+        script.onerror = () => {
+            console.error('Failed to load Chart.js');
+        };
+        document.head.appendChild(script);
+    } else {
+        console.log('Chart.js already loaded, creating chart...');
+        createChart(datasets);
+    }
+}
+
+function createChart(datasets) {
+    const canvas = document.getElementById('position-chart');
+    if (!canvas) {
+        console.log('Canvas element not found');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    if (positionChart) {
+        positionChart.destroy();
+    }
+    
+    // Находим максимальное количество команд для определения max оси Y
+    const maxTeams = window.positionChartData.teams.length;
+    
+    positionChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: window.positionChartData.rounds,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        font: { size: 10 },
+                        boxWidth: 12
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const teamName = context.dataset.label;
+                            const position = context.raw;
+                            return `${teamName}: ${position === null ? 'N/A' : position + ' place'}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    reverse: true,
+                    title: {
+                        display: true,
+                        text: 'Position',
+                        font: { weight: 'bold' }
+                    },
+                    min: 1,
+                    max: maxTeams,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            return value;
+                        }
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Round',
+                        font: { weight: 'bold' }
+                    }
+                }
+            }
+        }
+    });
+    
+    console.log('Chart created successfully');
+}
+
+function resetChartSelection() {
+    const teamSelector = document.getElementById('team-selector');
+    if (teamSelector) {
+        // Снимаем все выделения
+        Array.from(teamSelector.options).forEach(opt => {
+            opt.selected = false;
+        });
+        // Выбираем "Show All"
+        const allOption = teamSelector.querySelector('option[value="all"]');
+        if (allOption) allOption.selected = true;
+    }
+    updatePositionChart();
+}
+
 function switchTournamentTab(tabName) {
     const tabs = document.querySelectorAll('.tab');
     const panes = document.querySelectorAll('.tab-pane');
@@ -284,11 +524,24 @@ function switchTournamentTab(tabName) {
     
     if (event && event.target) {
         event.target.classList.add('active');
+    } else {
+        tabs.forEach(tab => {
+            if (tab.textContent.toLowerCase().includes(tabName)) {
+                tab.classList.add('active');
+            }
+        });
     }
     
     const activePane = document.getElementById(`tournament-${tabName}`);
     if (activePane) {
         activePane.classList.add('active');
+    }
+    
+    // Обновляем график при переключении на вкладку истории
+    if (tabName === 'history' && positionChart) {
+        setTimeout(() => {
+            if (positionChart) positionChart.resize();
+        }, 100);
     }
 }
 

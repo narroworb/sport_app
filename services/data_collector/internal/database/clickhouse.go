@@ -313,6 +313,25 @@ func (c *ClichouseDB) GetFootballPlayerID(ctx context.Context, name string, date
 	return id, nil
 }
 
+func (c *ClichouseDB) GetFootballPlayerIDByAlternativeSearch(ctx context.Context, name string, dateOfBirth time.Time, position string, country string, height uint16) (uint32, error) {
+	firstName := strings.Split(name, " ")[0]
+	lastName := strings.TrimSpace(strings.Join(strings.Split(name, " ")[1:], " "))
+	if lastName == "" {
+		lastName = firstName
+		firstName = ""
+	}
+	row := c.conn.QueryRow(ctx,
+		`SELECT athlete_id FROM Athletes
+		WHERE sport_id=1 AND 
+		((first_name=$1) + (last_name=$2) + (date_of_birth=$3) + (position=$4) + (nation=$5) + (height=$6)) >= 5`,
+		firstName, lastName, dateOfBirth, position, country, height)
+	var id uint32
+	if err := row.Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
 func (c *ClichouseDB) InsertFootballPlayer(ctx context.Context, player *models.Player) (uint32, error) {
 	id := c.NextFootballPlayerID()
 
@@ -811,4 +830,16 @@ func (c *ClichouseDB) GetMatchesByTournamentAndRound(ctx context.Context, season
 	}
 
 	return res, nil
+}
+
+func (c *ClichouseDB) GetFootballTeamIDByAlternativeName(ctx context.Context, name string) (uint32, error) {
+	row := c.conn.QueryRow(ctx,
+		`SELECT team_id FROM Teams
+		WHERE arrayExists(x -> x = $1, alternative_names) = 1`,
+		name)
+	var id uint32
+	if err := row.Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
 }

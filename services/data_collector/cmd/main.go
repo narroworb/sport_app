@@ -55,7 +55,7 @@ func main() {
 	updaterWithStats := collector.NewUpdater(db, producer)
 	log.Println("Connected to updater")
 
-	schedulerStats := scheduler.NewScheduler(updaterWithStats.StartUpdate)
+	schedulerStats := scheduler.NewScheduler(updaterWithStats.StartUpdate, "udpate with stats")
 
 	log.Println("scheduler by stats created")
 
@@ -63,7 +63,7 @@ func main() {
 
 	updaterWithoutStats := collector.NewUpdater(db, producer)
 
-	schedulerWithoutStats := scheduler.NewScheduler(updaterWithoutStats.StartUpdateWithoutStatistics)
+	schedulerWithoutStats := scheduler.NewScheduler(updaterWithoutStats.StartUpdateWithoutStatistics, "udpate without stats")
 
 	log.Println("scheduler without stats created")
 

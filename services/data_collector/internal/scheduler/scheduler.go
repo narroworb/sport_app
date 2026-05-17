@@ -7,16 +7,19 @@ import (
 )
 
 type Scheduler struct {
-	task    func()
-	trigger chan struct{}
-	active  bool
-	mu      sync.Mutex
+	task     func()
+	taskName string
+	trigger  chan struct{}
+	active   bool
+	mu       *sync.Mutex
 }
 
-func NewScheduler(task func()) *Scheduler {
+func NewScheduler(task func(), taskName string) *Scheduler {
 	return &Scheduler{
-		task:    task,
-		trigger: make(chan struct{}, 1),
+		task:     task,
+		taskName: taskName,
+		trigger:  make(chan struct{}, 1),
+		mu:       &sync.Mutex{},
 	}
 }
 
@@ -30,39 +33,41 @@ func (s *Scheduler) Start(period time.Duration) {
 		case <-ticker.C:
 			s.mu.Lock()
 			if s.active {
-				log.Println("get request to update from timer, but already in progress")
+				log.Printf("get request to %s from timer, but already in progress\n", s.taskName)
 				s.mu.Unlock()
 				continue
 			}
-			log.Println("start update")
+			log.Printf("start %s\n", s.taskName)
 			s.active = true
 			s.mu.Unlock()
-			go func() {
-				defer func() { 
+			go func(s *Scheduler) {
+				defer func(s *Scheduler) {
+					log.Printf("end of %s\n", s.taskName)
 					s.mu.Lock()
 					s.active = false
 					s.mu.Unlock()
-				}()
+				}(s)
 				s.task()
-			}()
+			}(s)
 		case <-s.trigger:
 			s.mu.Lock()
 			if s.active {
-				log.Println("get request to update from api, but already in progress")
+				log.Printf("get request to %s from timer, but already in progress\n", s.taskName)
 				s.mu.Unlock()
 				continue
 			}
-			log.Println("start update")
+			log.Printf("start %s\n", s.taskName)
 			s.active = true
 			s.mu.Unlock()
-			go func() {
-				defer func() { 
+			go func(s *Scheduler) {
+				defer func(s *Scheduler) {
+					log.Printf("end of %s\n", s.taskName)
 					s.mu.Lock()
 					s.active = false
 					s.mu.Unlock()
-				}()
+				}(s)
 				s.task()
-			}()
+			}(s)
 		}
 	}
 }

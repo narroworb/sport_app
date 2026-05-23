@@ -14,7 +14,7 @@
             </div>
             <div class="nav-menu">
                 <a href="/" class="nav-link">Home</a>
-                <a href="/search.html" class="nav-link">Search</a>
+                <a href="/search" class="nav-link">Search</a>
                 <div class="auth-section">
                     <span id="user-name" style="display:none; margin-right: 15px;"></span>
                     <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Login</button>
@@ -51,7 +51,7 @@
 
     <main class="container">
         <div id="player-detail" class="detail-container">
-            <div class="detail-header">
+           <div class="detail-header">
                 <div class="detail-title">
                     <h1 id="player-name">Loading...</h1>
                     <div class="detail-meta">
@@ -64,28 +64,76 @@
                 </div>
             </div>
 
+            <!-- НОВЫЙ БЛОК: Дополнительная информация об игроке -->
+            <div class="player-info" style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 2rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: bold;">🎂 Born:</span>
+                    <span id="player-birthdate">-</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: bold;">📏 Height:</span>
+                    <span id="player-height">-</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: bold;">🦶 Preferred Foot:</span>
+                    <span id="player-foot">-</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: bold;">📋 Status:</span>
+                    <span id="player-status">-</span>
+                </div>
+            </div>
             <!-- Фильтры статистики -->
             <div class="stats-filters" style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
                 <h4 style="margin-bottom: 0.5rem;">📊 Filter Statistics</h4>
+                <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                    <!-- Фильтр по сезону -->
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="font-weight: bold;">Filter by Season:</label>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                            <select id="season-filter" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                                <option value="">Select Season</option>
+                            </select>
+                            <button id="apply-season" class="btn-primary" style="padding: 0.5rem 1rem;">Apply</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Фильтр по датам -->
+                    <div style="flex: 2; min-width: 300px;">
+                        <label style="font-weight: bold;">Filter by Date Range:</label>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                            <input type="date" id="date-from" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;" placeholder="Date From">
+                            <input type="date" id="date-to" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;" placeholder="Date To">
+                            <button id="apply-date" class="btn-primary" style="padding: 0.5rem 1rem;">Apply</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Сброс -->
+                    <div style="display: flex; align-items: flex-end;">
+                        <button id="reset-filters" class="btn-secondary" style="padding: 0.5rem 1rem;">Reset All</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="similar-settings" style="margin: 1rem 0; padding: 1rem; background: #e8f4f8; border-radius: 8px;">
+                <h4 style="margin-bottom: 0.5rem;">🔄 Similar Players Settings</h4>
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
-                    <div style="flex: 1; min-width: 150px;">
-                        <label>Filter by Season:</label>
-                        <select id="season-filter" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
-                            <option value="">All Seasons</option>
+                    <div style="min-width: 120px;">
+                        <label>Top K:</label>
+                        <input type="number" id="similar-top-k" min="1" max="20" value="5" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                    </div>
+                    <div style="min-width: 150px;">
+                        <label>Min Minutes:</label>
+                        <input type="number" id="similar-min-minutes" min="0" max="5000" value="100" step="50" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                    </div>
+                    <div style="min-width: 150px;">
+                        <label>Season:</label>
+                        <select id="similar-season" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                            <option value="">Auto-detect</option>
                         </select>
                     </div>
-                    <div style="text-align: center; padding-top: 0.5rem;">OR</div>
-                    <div style="flex: 1; min-width: 150px;">
-                        <label>Date From:</label>
-                        <input type="date" id="date-from" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
-                    </div>
-                    <div style="flex: 1; min-width: 150px;">
-                        <label>Date To:</label>
-                        <input type="date" id="date-to" style="width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
-                    </div>
                     <div>
-                        <button id="apply-filters" class="btn-primary" style="padding: 0.5rem 1rem;">Apply Filters</button>
-                        <button id="reset-filters" class="btn-secondary" style="padding: 0.5rem 1rem;">Reset</button>
+                        <button id="find-similar-btn" class="btn-primary" style="padding: 0.5rem 1rem;">🔍 Find Similar Players</button>
                     </div>
                 </div>
             </div>
@@ -103,7 +151,6 @@
                         <tr>
                             <th>Team</th>
                             <th>Season</th>
-                            <th>Position</th>
                         </tr>
                     </thead>
                     <tbody id="teams-tbody"></tbody>

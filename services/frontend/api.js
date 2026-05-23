@@ -7,19 +7,37 @@ const AUTH_BASE = window.location.origin;
 // Token Management
 class TokenManager {
     static setToken(token) {
-        localStorage.setItem('token', token);
+        try {
+            localStorage.setItem('token', token);
+            console.log('Token saved to localStorage');
+        } catch (e) {
+            console.error('Failed to save token:', e);
+        }
     }
 
     static getToken() {
-        return localStorage.getItem('token');
+        try {
+            const token = localStorage.getItem('token');
+            console.log('Token retrieved from localStorage, exists:', !!token);
+            return token;
+        } catch (e) {
+            console.error('Failed to get token:', e);
+            return null;
+        }
     }
 
     static removeToken() {
-        localStorage.removeItem('token');
+        try {
+            localStorage.removeItem('token');
+            console.log('Token removed from localStorage');
+        } catch (e) {
+            console.error('Failed to remove token:', e);
+        }
     }
 
     static hasToken() {
-        return !!this.getToken();
+        const token = this.getToken();
+        return !!token && token.length > 0;
     }
 }
 
@@ -33,6 +51,7 @@ async function apiCall(endpoint, options = {}) {
 
     const token = TokenManager.getToken();
     if (token) {
+        // Для API запросов используем Bearer
         headers['Authorization'] = `Bearer ${token}`;
     }
 
@@ -43,7 +62,10 @@ async function apiCall(endpoint, options = {}) {
 
     if (response.status === 401) {
         TokenManager.removeToken();
-        window.location.href = '/';
+        if (window.location.pathname !== '/') {
+            window.location.href = '/';
+        }
+        throw new Error('Unauthorized');
     }
 
     if (!response.ok) {
@@ -66,19 +88,11 @@ const authAPI = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password }),
         });
-        
-        const responseText = await response.text();
-        
         if (!response.ok) {
-            throw new Error(responseText || `Registration failed: ${response.status}`);
+            const error = await response.text();
+            throw new Error(error || 'Registration failed');
         }
-        
-        // Возвращаем текст ответа (может быть "User registered successfully" или JSON)
-        try {
-            return JSON.parse(responseText);
-        } catch {
-            return { message: responseText };
-        }
+        return await response.json();
     },
 
     login: async (username, password) => {
@@ -87,25 +101,26 @@ const authAPI = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password }),
         });
-        
-        const responseText = await response.text();
-        
         if (!response.ok) {
-            throw new Error(responseText || `Login failed: ${response.status}`);
+            const error = await response.text();
+            throw new Error(error || 'Login failed');
         }
-        
-        try {
-            return JSON.parse(responseText);
-        } catch {
-            // Если ответ не JSON, предполагаем, что это сам токен
-            return { token: responseText };
-        }
+        return await response.json();
     },
 
     getMe: async () => {
-        return await apiCall('/me', {
+        const token = TokenManager.getToken();
+        if (!token) return null;
+        
+        // Для /me - без Bearer!
+        const response = await fetch(`${AUTH_BASE}/me`, {
             method: 'GET',
-        }).catch(() => null);
+            headers: { 
+                'Authorization': token  // Только токен, без Bearer
+            },
+        });
+        if (!response.ok) return null;
+        return await response.json();
     }
 };
 
@@ -126,8 +141,8 @@ const playerAPI = {
         return await apiCall(`/player/${id}/stats`);
     },
 
-    getFixtures: async (id) => {
-        return await apiCall(`/player/${id}/fixtures`);
+    getFixtures: async (id, limit = 10, offset = 0) => {
+        return await apiCall(`/player/${id}/fixtures?limit=${limit}&offset=${offset}`);
     },
 
     getTeams: async (id) => {
@@ -169,8 +184,8 @@ const teamAPI = {
         return await apiCall(`/team/${id}/players`);
     },
 
-    getFixtures: async (id) => {
-        return await apiCall(`/team/${id}/fixtures`);
+    getFixtures: async (id, limit = 10, offset = 0) => {
+        return await apiCall(`/team/${id}/fixtures?limit=${limit}&offset=${offset}`);
     },
 
     getManager: async (id) => {

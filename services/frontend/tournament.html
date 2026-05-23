@@ -14,7 +14,7 @@
             </div>
             <div class="nav-menu">
                 <a href="/" class="nav-link">Home</a>
-                <a href="/search.html" class="nav-link">Search</a>
+                <a href="/search" class="nav-link">Search</a>
                 <div class="auth-section">
                     <span id="user-name" style="display:none; margin-right: 15px;"></span>
                     <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Login</button>
@@ -90,33 +90,57 @@
                 </table>
             </div>
 
-            <div id="tournament-teams-stats" class="tab-pane">
-                <table class="table">
+           <div id="tournament-teams-stats" class="tab-pane">
+                <table class="table sortable-table">
                     <thead>
                         <tr>
-                            <th>Team</th>
-                            <th>Goals</th>
-                            <th>Shots</th>
-                            <th>Possession</th>
+                            <th data-sort="team_name">Team <span class="sort-icon">↕️</span></th>
+                            <th data-sort="matches">Matches <span class="sort-icon">↕️</span></th>
+                            <th data-sort="win_rate">Win Rate <span class="sort-icon">↕️</span></th>
+                            <th data-sort="goals">Goals <span class="sort-icon">↕️</span></th>
+                            <th data-sort="goals_per_90">G/90 <span class="sort-icon">↕️</span></th>
+                            <th data-sort="goals_conceded">Conceded <span class="sort-icon">↕️</span></th>
+                            <th data-sort="goals_conceded_per_90">C/90 <span class="sort-icon">↕️</span></th>
+                            <th data-sort="possession">Possession <span class="sort-icon">↕️</span></th>
+                            <th data-sort="total_shots">Shots <span class="sort-icon">↕️</span></th>
+                            <th data-sort="shots_on_goal">SoG <span class="sort-icon">↕️</span></th>
+                            <th data-sort="pass_accuracy">Pass Acc <span class="sort-icon">↕️</span></th>
                         </tr>
                     </thead>
                     <tbody id="teams-stats-tbody"></tbody>
                 </table>
             </div>
 
-            <div id="tournament-players-stats" class="tab-pane">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Player</th>
-                            <th>Team</th>
-                            <th>Goals</th>
-                            <th>Assists</th>
-                            <th>Rating</th>
-                        </tr>
-                    </thead>
-                    <tbody id="players-stats-tbody"></tbody>
-                </table>
+           <div id="tournament-players-stats" class="tab-pane">
+                <div style="overflow-x: auto;">
+                    <table class="table sortable-table" style="min-width: 1200px;">
+                        <thead>
+                            <tr>
+                                <th data-sort="player_name">Player <span class="sort-icon">↕️</span></th>
+                                <th data-sort="team_name">Team <span class="sort-icon">↕️</span></th>
+                                <th data-sort="matches">MP <span class="sort-icon">↕️</span></th>
+                                <th data-sort="goals">G <span class="sort-icon">↕️</span></th>
+                                <th data-sort="goals_per_90">G/90 <span class="sort-icon">↕️</span></th>
+                                <th data-sort="assists">A <span class="sort-icon">↕️</span></th>
+                                <th data-sort="assists_per_90">A/90 <span class="sort-icon">↕️</span></th>
+                                <th data-sort="rating">Rating <span class="sort-icon">↕️</span></th>
+                                <th data-sort="shots">Shots <span class="sort-icon">↕️</span></th>
+                                <th data-sort="shots_on_target">SoT <span class="sort-icon">↕️</span></th>
+                                <th data-sort="shots_on_target_per_90">SoT/90 <span class="sort-icon">↕️</span></th>
+                                <th data-sort="key_passes">KP <span class="sort-icon">↕️</span></th>
+                                <th data-sort="pass_attempts">Pass <span class="sort-icon">↕️</span></th>
+                                <th data-sort="complete_passes">Acc <span class="sort-icon">↕️</span></th>
+                                <th data-sort="pass_accuracy">Acc% <span class="sort-icon">↕️</span></th>
+                                <th data-sort="tackles">Tkl <span class="sort-icon">↕️</span></th>
+                                <th data-sort="interceptions">Int <span class="sort-icon">↕️</span></th>
+                                <th data-sort="fouls">Fouls <span class="sort-icon">↕️</span></th>
+                                <th data-sort="yellow_cards">YC <span class="sort-icon">↕️</span></th>
+                                <th data-sort="minutes">Mins <span class="sort-icon">↕️</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="players-stats-tbody"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div id="tournament-fixtures" class="tab-pane">

@@ -14,7 +14,7 @@
             </div>
             <div class="nav-menu">
                 <a href="/" class="nav-link">Home</a>
-                <a href="/search.html" class="nav-link">Search</a>
+                <a href="/search" class="nav-link">Search</a>
                 <div class="auth-section">
                     <span id="user-name" style="display:none; margin-right: 15px;"></span>
                     <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Login</button>
@@ -63,6 +63,32 @@
                 </div>
             </div>
 
+            <!-- Фильтры статистики -->
+            <div class="stats-filters" style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                <h4 style="margin-bottom: 0.5rem;">📊 Filter Statistics</h4>
+                <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="font-weight: bold;">Filter by Season:</label>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                            <select id="season-filter" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                                <option value="">Select Season</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="flex: 2; min-width: 300px;">
+                        <label style="font-weight: bold;">Filter by Date Range:</label>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                            <input type="date" id="date-from" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                            <input type="date" id="date-to" style="flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                        <button id="apply-filters" class="btn-primary" style="padding: 0.5rem 1rem;" onclick="applyStatsFilters()">Apply Filters</button>
+                        <button id="reset-filters" class="btn-secondary" style="padding: 0.5rem 1rem;" onclick="resetStatsFilters()">Reset</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="stats-grid" id="team-stats-grid"></div>
 
             <div class="tabs">
@@ -75,7 +101,18 @@
             <div id="team-overview" class="tab-pane active">
                 <h3>Next Game</h3>
                 <div id="next-game" class="card match-card"></div>
-                <h3 style="margin-top: 2rem;">Standing</h3>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Standing</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label>Season:</label>
+                        <select id="table-season-filter" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                            <option value="">Current Season</option>
+                        </select>
+                        <button id="apply-table-season" class="btn-primary" style="padding: 0.5rem 1rem;">Apply</button>
+                    </div>
+                </div>
+                
                 <table class="table" id="standing-table">
                     <thead>
                         <tr>
@@ -91,12 +128,17 @@
             </div>
 
             <div id="team-players" class="tab-pane">
-                <table class="table">
+                <table class="table sortable-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Position</th>
-                            <th>Number</th>
+                            <th data-sort="name">Player <span class="sort-icon">↕️</span></th>
+                            <th data-sort="position">Position <span class="sort-icon">↕️</span></th>
+                            <th data-sort="matches">Matches <span class="sort-icon">↕️</span></th>
+                            <th data-sort="goals">Goals <span class="sort-icon">↕️</span></th>
+                            <th data-sort="assists">Assists <span class="sort-icon">↕️</span></th>
+                            <th data-sort="rating">Rating <span class="sort-icon">↕️</span></th>
+                            <th data-sort="goals_per_90">G/90 <span class="sort-icon">↕️</span></th>
+                            <th data-sort="minutes">Minutes <span class="sort-icon">↕️</span></th>
                         </tr>
                     </thead>
                     <tbody id="players-tbody"></tbody>

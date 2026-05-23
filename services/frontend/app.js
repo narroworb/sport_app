@@ -1,35 +1,129 @@
 // Global State
 let currentUser = null;
+let currentMatchDate = new Date();
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     await checkAuth();
+    
+    // Инициализируем календарь
+    initDatePicker();
+    
     await loadRecentMatches();
-    await loadTournaments();
+    await loadFavorites();
     
     // Event listeners
     document.getElementById('login-form').addEventListener('submit', handleLogin);
     document.getElementById('register-form').addEventListener('submit', handleRegister);
+    
+    // Date navigation events
+    const prevBtn = document.getElementById('prev-day');
+    const nextBtn = document.getElementById('next-day');
+    const todayBtn = document.getElementById('today-date-filter');
+    
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => changeDate(-1));
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => changeDate(1));
+    }
+    if (todayBtn) {
+        todayBtn.addEventListener('click', () => goToToday());
+    }
 });
 
-// Authentication
+function initDatePicker() {
+    const dateInput = document.getElementById('match-date-calendar');
+    if (dateInput) {
+        flatpickr(dateInput, {
+            dateFormat: "Y-m-d",
+            locale: "ru",
+            onChange: function(selectedDates, dateStr) {
+                if (dateStr) {
+                    currentMatchDate = new Date(dateStr);
+                    updateDateDisplay();
+                    loadRecentMatches();
+                }
+            }
+        });
+    }
+    updateDateDisplay();
+}
+
+function updateDateDisplay() {
+    const dateInput = document.getElementById('match-date-calendar');
+    if (dateInput) {
+        const year = currentMatchDate.getFullYear();
+        const month = String(currentMatchDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentMatchDate.getDate()).padStart(2, '0');
+        dateInput.value = `${year}-${month}-${day}`;
+        
+        // Обновляем flatpickr если он уже инициализирован
+        if (dateInput._flatpickr) {
+            dateInput._flatpickr.setDate(currentMatchDate);
+        }
+    }
+}
+
+function changeDate(delta) {
+    const newDate = new Date(currentMatchDate);
+    newDate.setDate(newDate.getDate() + delta);
+    currentMatchDate = newDate;
+    updateDateDisplay();
+    loadRecentMatches();
+}
+
+function goToToday() {
+    currentMatchDate = new Date();
+    updateDateDisplay();
+    loadRecentMatches();
+}
+
+// Проверка при загрузке страницы
+console.log('Page loaded, checking stored token:', TokenManager.getToken());
+
 async function checkAuth() {
-    if (!TokenManager.hasToken()) {
+    const token = TokenManager.getToken();
+    console.log('=== CHECK AUTH START ===');
+    
+    if (!token) {
+        console.log('No token found');
+        currentUser = null;
+        updateAuthUI();
         return;
     }
 
     try {
-        currentUser = await authAPI.getMe();
-        if (currentUser) {
+        const response = await fetch('/me', {
+            method: 'GET',
+            headers: {
+                'Authorization': token
+            }
+        });
+        
+        console.log('/me response status:', response.status);
+        
+        if (response.ok) {
+            currentUser = await response.json();
+            console.log('User authenticated:', currentUser);
             updateAuthUI();
             if (document.getElementById('favorites-section')) {
                 document.getElementById('favorites-section').style.display = 'block';
+                if (typeof loadFavorites === 'function') {
+                    loadFavorites();
+                }
             }
+        } else {
+            console.log('Auth failed');
+            currentUser = null;
+            updateAuthUI();
         }
     } catch (error) {
         console.error('Auth check failed:', error);
-        TokenManager.removeToken();
+        currentUser = null;
+        updateAuthUI();
     }
+    console.log('=== CHECK AUTH END ===');
 }
 
 function updateAuthUI() {
@@ -72,13 +166,11 @@ async function handleLogin(e) {
             return;
         }
         
-        // Пытаемся распарсить JSON токен
         let token = null;
         try {
             const data = JSON.parse(responseText);
             token = data.token;
         } catch (e) {
-            // Если ответ не JSON, возможно токен пришел как plain text
             token = responseText;
         }
         
@@ -124,12 +216,10 @@ async function handleRegister(e) {
             body: JSON.stringify({ username, password }),
         });
         
-        // Получаем текст ответа (не JSON)
         const responseText = await response.text();
         console.log('Registration response:', response.status, responseText);
         
         if (!response.ok) {
-            // Обрабатываем разные статусы
             if (response.status === 409) {
                 errorDiv.textContent = `Username "${username}" already exists. Please choose another username or login.`;
             } else if (response.status === 400) {
@@ -140,7 +230,6 @@ async function handleRegister(e) {
             return;
         }
         
-        // Регистрация успешна
         errorDiv.style.color = '#2ecc71';
         errorDiv.textContent = responseText || 'Registration successful! Please login.';
         
@@ -179,47 +268,28 @@ function switchTab(tabName) {
     document.getElementById(`${tabName}-form`).classList.add('active');
 }
 
-// Content Loading
 async function loadRecentMatches() {
     const container = document.getElementById('recent-matches');
     if (!container) return;
 
     try {
-        const today = new Date().toISOString().split('T')[0];
-        const matches = await fixtureAPI.getByDate(today);
+        container.innerHTML = '<p class="loading">Loading matches...</p>';
+        
+        const year = currentMatchDate.getFullYear();
+        const month = String(currentMatchDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentMatchDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        const matches = await fixtureAPI.getByDate(dateStr);
 
         if (Array.isArray(matches) && matches.length > 0) {
-            container.innerHTML = matches.slice(0, 6).map(match => createMatchCard(match)).join('');
+            container.innerHTML = matches.slice(0, 12).map(match => createMatchCard(match)).join('');
         } else {
-            container.innerHTML = '<p class="loading">No matches today</p>';
+            container.innerHTML = '<p class="loading">No matches found for this date</p>';
         }
     } catch (error) {
         console.error('Error loading matches:', error);
-        const message = error.message || '';
-        if (message.includes('404') || message.toLowerCase().includes('fixtures not found')) {
-            container.innerHTML = '<p class="loading">No matches today</p>';
-        } else {
-            container.innerHTML = '<p class="loading">Failed to load matches</p>';
-        }
-    }
-}
-
-async function loadTournaments() {
-    const container = document.getElementById('tournaments');
-    if (!container) return;
-
-    try {
-        // In a real app, you'd have an endpoint to list tournaments
-        // For now, we'll show a message
-        container.innerHTML = `
-            <div class="card tournament-card">
-                <h3>Browse Tournaments</h3>
-                <p>Use the search feature to find tournaments and explore their standings and statistics.</p>
-                <a href="/search.html" class="btn-primary" style="text-decoration: none; text-align: center;">Go to Search</a>
-            </div>
-        `;
-    } catch (error) {
-        console.error('Error loading tournaments:', error);
+        container.innerHTML = '<p class="loading">Failed to load matches</p>';
     }
 }
 
@@ -264,26 +334,53 @@ async function loadFavorites() {
 
 function createMatchCard(match) {
     const date = new Date(match.date);
-    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const dateStr = date.toLocaleDateString();
     
-    // Правильные пути для вашего API
     const homeTeam = match.home_team?.name || 'Team A';
     const awayTeam = match.away_team?.name || 'Team B';
+    const homeTeamLogo = match.home_team?.url_logo || '';
+    const awayTeamLogo = match.away_team?.url_logo || '';
     const homeScore = match.home_team_score ?? 0;
     const awayScore = match.away_team_score ?? 0;
     const status = match.status || 'Not started';
     const matchId = match.match_id ?? 0;
-
+    const tournamentName = match.tournament?.name || '';
+    const tournamentLogo = match.tournament?.url_logo || '';
+    
+    let statusClass = '';
+    let statusText = status;
+    if (status === 'Ended') {
+        statusClass = 'status-ended';
+        statusText = '✓ Finished';
+    } else if (status === 'Not started') {
+        statusClass = 'status-scheduled';
+        statusText = '⏱ Scheduled';
+    }
+    
     return `
         <div class="card match-card" onclick="goToMatch(${matchId})">
-            <div class="match-header">${dateStr}</div>
-            <div class="match-score">
-                <span class="team-name">${homeTeam}</span>
-                <span class="score">${homeScore} - ${awayScore}</span>
-                <span class="team-name">${awayTeam}</span>
+            <div class="match-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    ${tournamentLogo ? `<img src="${tournamentLogo}" alt="${tournamentName}" style="height: 20px; width: 20px; object-fit: contain;">` : '🏆'}
+                    <span style="font-size: 0.8rem; color: #666;">${tournamentName}</span>
+                </div>
+                <div style="font-size: 0.8rem; color: #666;">${dateStr} • ${timeStr}</div>
             </div>
-            <div class="match-status">${status}</div>
-            ${match.tournament?.name ? `<div class="tournament-name">${match.tournament.name}</div>` : ''}
+            <div class="match-score" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; justify-content: flex-end;">
+                    ${homeTeamLogo ? `<img src="${homeTeamLogo}" alt="${homeTeam}" style="height: 35px; width: 35px; object-fit: contain;">` : ''}
+                    <span class="team-name" style="font-weight: 600; font-size: 1rem;">${homeTeam}</span>
+                </div>
+                <span class="score" style="font-size: 1.3rem; font-weight: bold; color: #2c3e50; min-width: 60px; text-align: center;">${homeScore} - ${awayScore}</span>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
+                    <span class="team-name" style="font-weight: 600; font-size: 1rem;">${awayTeam}</span>
+                    ${awayTeamLogo ? `<img src="${awayTeamLogo}" alt="${awayTeam}" style="height: 35px; width: 35px; object-fit: contain;">` : ''}
+                </div>
+            </div>
+            <div class="match-status ${statusClass}" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #eee; text-align: center; font-size: 0.8rem;">
+                ${statusText}
+            </div>
         </div>
     `;
 }
@@ -329,30 +426,29 @@ function createTournamentCard(tournament) {
     `;
 }
 
-// Navigation
 function performSearch() {
     const query = document.getElementById('main-search').value;
     if (query.trim()) {
-        window.location.href = `/search.html?q=${encodeURIComponent(query)}`;
+        window.location.href = `/search?q=${encodeURIComponent(query)}`;
     }
 }
 
 function goToPlayer(id) {
-    window.location.href = `/player.html?id=${id}`;
+    window.location.href = `/player?id=${id}`;
 }
 
 function goToTeam(id) {
-    window.location.href = `/team.html?id=${id}`;
+    window.location.href = `/team?id=${id}`;
 }
 
 function goToTournament(id) {
-    window.location.href = `/tournament.html?id=${id}`;
+    window.location.href = `/tournament?id=${id}`;
 }
 
 function goToManager(id) {
-    window.location.href = `/manager.html?id=${id}`;
+    window.location.href = `/manager?id=${id}`;
 }
 
 function goToMatch(id) {
-    window.location.href = `/match.html?id=${id}`;
+    window.location.href = `/match?id=${id}`;
 }

@@ -14,7 +14,7 @@
             </div>
             <div class="nav-menu">
                 <a href="/" class="nav-link">Home</a>
-                <a href="/search.html" class="nav-link">Search</a>
+                <a href="/search" class="nav-link">Search</a>
                 <div class="auth-section">
                     <span id="user-name" style="display:none; margin-right: 15px;"></span>
                     <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Login</button>
@@ -81,46 +81,28 @@
             </div>
 
             <div id="match-overview" class="tab-pane active">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                    <div>
-                        <h3 id="home-team-name-header"></h3>
-                        <div class="stats-grid">
-                            <div class="stat-box">
-                                <div class="stat-value" id="home-shots">-</div>
-                                <div class="stat-label">Shots</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-value" id="home-possession">-</div>
-                                <div class="stat-label">Possession</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <h3 id="away-team-name-header"></h3>
-                        <div class="stats-grid">
-                            <div class="stat-box">
-                                <div class="stat-value" id="away-shots">-</div>
-                                <div class="stat-label">Shots</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-value" id="away-possession">-</div>
-                                <div class="stat-label">Possession</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Сюда динамически будет добавляться статистика -->
             </div>
 
             <div id="match-players" class="tab-pane">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; overflow-x: auto;">
                     <div>
                         <h3>Home Players</h3>
-                        <table class="table">
+                        <table class="table sortable-table" id="home-players-table" style="min-width: 900px;">
                             <thead>
                                 <tr>
-                                    <th>Player</th>
-                                    <th>Goals</th>
-                                    <th>Rating</th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortHomePlayers('name')">Player <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="goals" onclick="sortHomePlayers('goals')">G <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="assists" onclick="sortHomePlayers('assists')">A <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots" onclick="sortHomePlayers('shots')">Shots <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots_on_target" onclick="sortHomePlayers('shots_on_target')">SoT <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="key_passes" onclick="sortHomePlayers('key_passes')">KP <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="tackles" onclick="sortHomePlayers('tackles')">Tkl <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="interceptions" onclick="sortHomePlayers('interceptions')">Int <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="fouls" onclick="sortHomePlayers('fouls')">Fouls <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="yellow_cards" onclick="sortHomePlayers('yellow_cards')">YC <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortHomePlayers('rating')">Rating <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="minutes" onclick="sortHomePlayers('minutes')">Mins <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="home-players-tbody"></tbody>
@@ -128,12 +110,21 @@
                     </div>
                     <div>
                         <h3>Away Players</h3>
-                        <table class="table">
+                        <table class="table sortable-table" id="away-players-table" style="min-width: 900px;">
                             <thead>
                                 <tr>
-                                    <th>Player</th>
-                                    <th>Goals</th>
-                                    <th>Rating</th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortAwayPlayers('name')">Player <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="goals" onclick="sortAwayPlayers('goals')">G <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="assists" onclick="sortAwayPlayers('assists')">A <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots" onclick="sortAwayPlayers('shots')">Shots <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots_on_target" onclick="sortAwayPlayers('shots_on_target')">SoT <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="key_passes" onclick="sortAwayPlayers('key_passes')">KP <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="tackles" onclick="sortAwayPlayers('tackles')">Tkl <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="interceptions" onclick="sortAwayPlayers('interceptions')">Int <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="fouls" onclick="sortAwayPlayers('fouls')">Fouls <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="yellow_cards" onclick="sortAwayPlayers('yellow_cards')">YC <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortAwayPlayers('rating')">Rating <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="minutes" onclick="sortAwayPlayers('minutes')">Mins <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="away-players-tbody"></tbody>
@@ -143,15 +134,20 @@
             </div>
 
             <div id="match-goalies" class="tab-pane">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; overflow-x: auto;">
                     <div>
                         <h3>Home Goalies</h3>
-                        <table class="table">
+                        <table class="table sortable-table" id="home-goalies-table" style="min-width: 700px;">
                             <thead>
                                 <tr>
-                                    <th>Goalie</th>
-                                    <th>Saves</th>
-                                    <th>Rating</th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortHomeGoalies('name')">Goalie <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="saves" onclick="sortHomeGoalies('saves')">Saves <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="conceded" onclick="sortHomeGoalies('conceded')">Conceded <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes" onclick="sortHomeGoalies('passes')">Pass <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes_accuracy" onclick="sortHomeGoalies('passes_accuracy')">Acc% <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_saved" onclick="sortHomeGoalies('penalty_saved')">Pen Saved <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_conceded" onclick="sortHomeGoalies('penalty_conceded')">Pen Conc <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortHomeGoalies('rating')">Rating <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="home-goalies-tbody"></tbody>
@@ -159,12 +155,17 @@
                     </div>
                     <div>
                         <h3>Away Goalies</h3>
-                        <table class="table">
+                        <table class="table sortable-table" id="away-goalies-table" style="min-width: 700px;">
                             <thead>
                                 <tr>
-                                    <th>Goalie</th>
-                                    <th>Saves</th>
-                                    <th>Rating</th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortAwayGoalies('name')">Goalie <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="saves" onclick="sortAwayGoalies('saves')">Saves <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="conceded" onclick="sortAwayGoalies('conceded')">Conceded <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes" onclick="sortAwayGoalies('passes')">Pass <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes_accuracy" onclick="sortAwayGoalies('passes_accuracy')">Acc% <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_saved" onclick="sortAwayGoalies('penalty_saved')">Pen Saved <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_conceded" onclick="sortAwayGoalies('penalty_conceded')">Pen Conc <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortAwayGoalies('rating')">Rating <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="away-goalies-tbody"></tbody>

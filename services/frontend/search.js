@@ -1,4 +1,4 @@
-// Search page functionality
+// Функционал страницы поиска
 let searchResultsCache = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -33,7 +33,7 @@ async function loadPlayerDetails(athleteId) {
             return await response.json();
         }
     } catch (error) {
-        console.error(`Error loading player ${athleteId} details:`, error);
+        console.error(`Ошибка загрузки деталей игрока ${athleteId}:`, error);
     }
     return null;
 }
@@ -46,7 +46,7 @@ async function loadTeamDetails(teamId) {
             return await response.json();
         }
     } catch (error) {
-        console.error(`Error loading team ${teamId} details:`, error);
+        console.error(`Ошибка загрузки деталей команды ${teamId}:`, error);
     }
     return null;
 }
@@ -59,12 +59,12 @@ async function loadTournamentDetails(tournamentId) {
             return await response.json();
         }
     } catch (error) {
-        console.error(`Error loading tournament ${tournamentId} details:`, error);
+        console.error(`Ошибка загрузки деталей турнира ${tournamentId}:`, error);
     }
     return null;
 }
 
-// Функция для загрузки деталей менеджеров
+// Функция для загрузки деталей тренеров
 async function loadManagerDetails(managerId) {
     try {
         const response = await fetch(`/api/manager/${managerId}/details`);
@@ -72,7 +72,7 @@ async function loadManagerDetails(managerId) {
             return await response.json();
         }
     } catch (error) {
-        console.error(`Error loading manager ${managerId} details:`, error);
+        console.error(`Ошибка загрузки деталей тренера ${managerId}:`, error);
     }
     return null;
 }
@@ -80,7 +80,7 @@ async function loadManagerDetails(managerId) {
 async function performSearch() {
     const query = document.getElementById('search-input').value.trim();
     if (!query) {
-        document.getElementById('search-results').innerHTML = '<p class="loading">Enter a search term</p>';
+        document.getElementById('search-results').innerHTML = '<p class="loading">Введите поисковый запрос</p>';
         return;
     }
 
@@ -88,14 +88,14 @@ async function performSearch() {
     window.history.pushState({}, '', `/search/${encodeURIComponent(query)}`);
 
     const resultsDiv = document.getElementById('search-results');
-    resultsDiv.innerHTML = '<p class="loading">Searching...</p>';
+    resultsDiv.innerHTML = '<p class="loading">Поиск...</p>';
 
     try {
         const response = await searchAPI.search(query);
-        console.log('Search response:', response);
+        console.log('Ответ поиска:', response);
         
         if (!response || (response.total === 0 && (!response.results || response.results.length === 0))) {
-            resultsDiv.innerHTML = '<p class="loading">No results found</p>';
+            resultsDiv.innerHTML = '<p class="loading">Ничего не найдено</p>';
             return;
         }
 
@@ -150,14 +150,14 @@ async function performSearch() {
         html += '</div>';
         
         if (allResults.length === 0) {
-            html = '<p class="loading">No results found</p>';
+            html = '<p class="loading">Ничего не найдено</p>';
         }
         
         resultsDiv.innerHTML = html;
         
     } catch (error) {
-        console.error('Search error:', error);
-        resultsDiv.innerHTML = '<p class="loading">Search failed. Please try again.</p>';
+        console.error('Ошибка поиска:', error);
+        resultsDiv.innerHTML = '<p class="loading">Ошибка поиска. Пожалуйста, попробуйте снова.</p>';
     }
 }
 
@@ -182,9 +182,9 @@ function createSearchResultCard(result) {
     if (type === 'player') {
         const firstName = details?.first_name || data.first_name || '';
         const lastName = details?.last_name || data.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim() || data.name || 'Unknown';
+        const fullName = `${firstName} ${lastName}`.trim() || data.name || 'Неизвестно';
         const photo = details?.url_photo || '';
-        const position = details?.position || data.position || 'N/A';
+        const position = details?.position || data.position || 'Н/Д';
         const nationName = details?.nation?.name || '';
         const nationFlag = details?.nation?.url_flag || '';
         
@@ -202,13 +202,13 @@ function createSearchResultCard(result) {
                         ${nationName ? `<span style="font-size: 0.8rem; color: #666;">${nationName}</span>` : ''}
                     </div>
                     <div style="font-size: 0.85rem; color: #666;">${positionDisplay}</div>
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Match: ${score}%</div>` : ''}
+                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
                 </div>
             </div>
         `;
     } 
     else if (type === 'team') {
-        const teamName = details?.name || data.name || 'Unknown';
+        const teamName = details?.name || data.name || 'Неизвестно';
         const logo = details?.url_logo || data.url_logo || '';
         const tournament = details?.tournament?.name || '';
         
@@ -219,13 +219,13 @@ function createSearchResultCard(result) {
                 <div style="flex: 1;">
                     <strong style="font-size: 1.1rem;">${teamName}</strong>
                     ${tournament ? `<div style="font-size: 0.8rem; color: #666;">${tournament}</div>` : ''}
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Match: ${score}%</div>` : ''}
+                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
                 </div>
             </div>
         `;
     }
     else if (type === 'tournament') {
-        const tournamentName = details?.name || data.name || 'Unknown';
+        const tournamentName = details?.name || data.name || 'Неизвестно';
         const logo = details?.url_logo || data.url_logo || '';
         const season = details?.season || data.season || '';
         const country = details?.country?.name || '';
@@ -242,7 +242,7 @@ function createSearchResultCard(result) {
                         ${countryFlag ? `<img src="${countryFlag}" alt="${country}" style="height: 16px;">` : ''}
                         ${country ? `<span style="font-size: 0.8rem; color: #666;">${country}</span>` : ''}
                     </div>
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Match: ${score}%</div>` : ''}
+                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
                 </div>
             </div>
         `;
@@ -250,7 +250,7 @@ function createSearchResultCard(result) {
     else if (type === 'manager') {
         const firstName = details?.first_name || '';
         const lastName = details?.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim() || data.name || 'Unknown';
+        const fullName = `${firstName} ${lastName}`.trim() || data.name || 'Неизвестно';
         const photo = details?.url_photo || '';
         const nationName = details?.nation?.name || '';
         const nationFlag = details?.nation?.url_flag || '';
@@ -265,31 +265,26 @@ function createSearchResultCard(result) {
                         ${nationFlag ? `<img src="${nationFlag}" alt="${nationName}" style="height: 20px;">` : ''}
                         ${nationName ? `<span style="font-size: 0.8rem; color: #666;">${nationName}</span>` : ''}
                     </div>
-                    <div style="font-size: 0.85rem; color: #666;">Manager</div>
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Match: ${score}%</div>` : ''}
+                    <div style="font-size: 0.85rem; color: #666;">Тренер</div>
+                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
                 </div>
             </div>
         `;
     }
     
     // Генерация ID для ссылки
-    let linkId = '';
     let linkUrl = '';
     if (type === 'player') {
         const playerId = details?.athlete_id || data.athlete_id || data.id;
-        linkId = playerId;
         linkUrl = `/player?id=${playerId}`;
     } else if (type === 'team') {
         const teamId = details?.team_id || data.team_id || data.id;
-        linkId = teamId;
         linkUrl = `/team?id=${teamId}`;
     } else if (type === 'tournament') {
         const tournamentId = details?.tournament_id || data.tournament_id || data.id;
-        linkId = tournamentId;
         linkUrl = `/tournament?id=${tournamentId}`;
     } else if (type === 'manager') {
         const managerId = details?.manager_id || data.manager_id || data.id;
-        linkId = managerId;
         linkUrl = `/manager?id=${managerId}`;
     }
     
@@ -300,7 +295,7 @@ function createSearchResultCard(result) {
             </div>
             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
                 <span class="result-type" style="background: ${info.color};">${info.icon} ${info.label}</span>
-                <span style="font-size: 0.7rem; color: #666;">Score: ${(score || 0)}%</span>
+                <span style="font-size: 0.7rem; color: #666;">Совпадение: ${(score || 0)}%</span>
             </div>
         </div>
     `;

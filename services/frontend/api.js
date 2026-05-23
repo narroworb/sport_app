@@ -1,27 +1,27 @@
 // API Configuration
-// Using local endpoints through Nginx proxy for development
-// In production, update these URLs to your domain
+// Использование локальных эндпоинтов через прокси Nginx для разработки
+// В продакшене обновите эти URL на ваш домен
 const API_BASE = '/api';
 const AUTH_BASE = window.location.origin;
 
-// Token Management
+// Управление токенами
 class TokenManager {
     static setToken(token) {
         try {
             localStorage.setItem('token', token);
-            console.log('Token saved to localStorage');
+            console.log('Токен сохранен в localStorage');
         } catch (e) {
-            console.error('Failed to save token:', e);
+            console.error('Не удалось сохранить токен:', e);
         }
     }
 
     static getToken() {
         try {
             const token = localStorage.getItem('token');
-            console.log('Token retrieved from localStorage, exists:', !!token);
+            console.log('Токен получен из localStorage, существует:', !!token);
             return token;
         } catch (e) {
-            console.error('Failed to get token:', e);
+            console.error('Не удалось получить токен:', e);
             return null;
         }
     }
@@ -29,9 +29,9 @@ class TokenManager {
     static removeToken() {
         try {
             localStorage.removeItem('token');
-            console.log('Token removed from localStorage');
+            console.log('Токен удален из localStorage');
         } catch (e) {
-            console.error('Failed to remove token:', e);
+            console.error('Не удалось удалить токен:', e);
         }
     }
 
@@ -65,12 +65,12 @@ async function apiCall(endpoint, options = {}) {
         if (window.location.pathname !== '/') {
             window.location.href = '/';
         }
-        throw new Error('Unauthorized');
+        throw new Error('Неавторизовано');
     }
 
     if (!response.ok) {
         const error = await response.text();
-        throw new Error(error || `API Error: ${response.status}`);
+        throw new Error(error || `Ошибка API: ${response.status}`);
     }
 
     const contentType = response.headers.get('content-type');
@@ -80,7 +80,7 @@ async function apiCall(endpoint, options = {}) {
     return response;
 }
 
-// Auth API
+// API аутентификации
 const authAPI = {
     register: async (username, password) => {
         const response = await fetch(`${AUTH_BASE}/register`, {
@@ -90,7 +90,7 @@ const authAPI = {
         });
         if (!response.ok) {
             const error = await response.text();
-            throw new Error(error || 'Registration failed');
+            throw new Error(error || 'Ошибка регистрации');
         }
         return await response.json();
     },
@@ -103,7 +103,7 @@ const authAPI = {
         });
         if (!response.ok) {
             const error = await response.text();
-            throw new Error(error || 'Login failed');
+            throw new Error(error || 'Ошибка входа');
         }
         return await response.json();
     },
@@ -124,14 +124,14 @@ const authAPI = {
     }
 };
 
-// Search API
+// API поиска
 const searchAPI = {
     search: async (query) => {
         return await apiCall(`/search?q=${encodeURIComponent(query)}`);
     }
 };
 
-// Player API
+// API игроков
 const playerAPI = {
     getDetails: async (id) => {
         return await apiCall(`/player/${id}/details`);
@@ -162,7 +162,7 @@ const playerAPI = {
     }
 };
 
-// Team API
+// API команд
 const teamAPI = {
     getDetails: async (id) => {
         return await apiCall(`/team/${id}/details`);
@@ -209,7 +209,7 @@ const teamAPI = {
     }
 };
 
-// Tournament API
+// API турниров
 const tournamentAPI = {
     getDetails: async (id) => {
         return await apiCall(`/tournament/${id}/details`);
@@ -248,7 +248,7 @@ const tournamentAPI = {
     }
 };
 
-// Manager API
+// API тренеров
 const managerAPI = {
     getDetails: async (id) => {
         return await apiCall(`/manager/${id}/details`);
@@ -279,7 +279,7 @@ const managerAPI = {
     }
 };
 
-// Fixture API
+// API матчей
 const fixtureAPI = {
     getDetails: async (id) => {
         return await apiCall(`/fixture/${id}/details`);
@@ -302,7 +302,7 @@ const fixtureAPI = {
     }
 };
 
-// Analytics API
+// API аналитики
 const analyticsAPI = {
     getStats: async (endpoint) => {
         return await apiCall(`/analytics${endpoint}`);

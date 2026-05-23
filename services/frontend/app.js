@@ -80,14 +80,14 @@ function goToToday() {
 }
 
 // Проверка при загрузке страницы
-console.log('Page loaded, checking stored token:', TokenManager.getToken());
+console.log('Страница загружена, проверяем сохраненный токен:', TokenManager.getToken());
 
 async function checkAuth() {
     const token = TokenManager.getToken();
-    console.log('=== CHECK AUTH START ===');
+    console.log('=== НАЧАЛО ПРОВЕРКИ АУТЕНТИФИКАЦИИ ===');
     
     if (!token) {
-        console.log('No token found');
+        console.log('Токен не найден');
         currentUser = null;
         updateAuthUI();
         return;
@@ -101,11 +101,11 @@ async function checkAuth() {
             }
         });
         
-        console.log('/me response status:', response.status);
+        console.log('Статус ответа /me:', response.status);
         
         if (response.ok) {
             currentUser = await response.json();
-            console.log('User authenticated:', currentUser);
+            console.log('Пользователь аутентифицирован:', currentUser);
             updateAuthUI();
             if (document.getElementById('favorites-section')) {
                 document.getElementById('favorites-section').style.display = 'block';
@@ -114,16 +114,16 @@ async function checkAuth() {
                 }
             }
         } else {
-            console.log('Auth failed');
+            console.log('Ошибка аутентификации');
             currentUser = null;
             updateAuthUI();
         }
     } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error('Ошибка проверки аутентификации:', error);
         currentUser = null;
         updateAuthUI();
     }
-    console.log('=== CHECK AUTH END ===');
+    console.log('=== КОНЕЦ ПРОВЕРКИ АУТЕНТИФИКАЦИИ ===');
 }
 
 function updateAuthUI() {
@@ -159,10 +159,10 @@ async function handleLogin(e) {
         });
         
         const responseText = await response.text();
-        console.log('Login response:', response.status, responseText);
+        console.log('Ответ входа:', response.status, responseText);
         
         if (!response.ok) {
-            errorDiv.textContent = responseText || 'Login failed. Check your credentials.';
+            errorDiv.textContent = responseText || 'Ошибка входа. Проверьте данные и попробуйте снова.';
             return;
         }
         
@@ -186,11 +186,11 @@ async function handleLogin(e) {
                 loadFavorites();
             }
         } else {
-            errorDiv.textContent = 'Login failed: No token received';
+            errorDiv.textContent = 'Ошибка входа: токен не получен';
         }
     } catch (error) {
-        console.error('Login error:', error);
-        errorDiv.textContent = 'Login failed. Please try again later.';
+        console.error('Ошибка входа:', error);
+        errorDiv.textContent = 'Ошибка входа. Попробуйте позже.';
     }
 }
 
@@ -202,7 +202,7 @@ async function handleRegister(e) {
     const errorDiv = document.getElementById('register-error');
     
     if (password !== passwordConfirm) {
-        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.textContent = 'Пароли не совпадают';
         return;
     }
 
@@ -217,21 +217,21 @@ async function handleRegister(e) {
         });
         
         const responseText = await response.text();
-        console.log('Registration response:', response.status, responseText);
+        console.log('Ответ регистрации:', response.status, responseText);
         
         if (!response.ok) {
             if (response.status === 409) {
-                errorDiv.textContent = `Username "${username}" already exists. Please choose another username or login.`;
+                errorDiv.textContent = `Пользователь "${username}" уже существует. Выберите другой логин или войдите.`;
             } else if (response.status === 400) {
-                errorDiv.textContent = responseText || 'Invalid username or password format.';
+                errorDiv.textContent = responseText || 'Неверный формат логина или пароля.';
             } else {
-                errorDiv.textContent = responseText || `Registration failed: ${response.status}`;
+                errorDiv.textContent = responseText || `Ошибка регистрации: ${response.status}`;
             }
             return;
         }
         
         errorDiv.style.color = '#2ecc71';
-        errorDiv.textContent = responseText || 'Registration successful! Please login.';
+        errorDiv.textContent = responseText || 'Регистрация прошла успешно! Войдите в систему.';
         
         setTimeout(() => {
             switchTab('login');
@@ -240,8 +240,8 @@ async function handleRegister(e) {
             errorDiv.style.color = '#e74c3c';
         }, 2000);
     } catch (error) {
-        console.error('Registration error:', error);
-        errorDiv.textContent = 'Registration failed. Please try again later.';
+        console.error('Ошибка регистрации:', error);
+        errorDiv.textContent = 'Ошибка регистрации. Попробуйте позже.';
     }
 }
 
@@ -260,11 +260,12 @@ function toggleAuthPanel() {
     panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
 }
 
-function switchTab(tabName) {
+function switchTab(tabName, event) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
-    event.target.classList.add('active');
+    const targetButton = event?.target || document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
+    targetButton?.classList.add('active');
     document.getElementById(`${tabName}-form`).classList.add('active');
 }
 
@@ -273,7 +274,7 @@ async function loadRecentMatches() {
     if (!container) return;
 
     try {
-        container.innerHTML = '<p class="loading">Loading matches...</p>';
+        container.innerHTML = '<p class="loading">Загрузка матчей...</p>';
         
         const year = currentMatchDate.getFullYear();
         const month = String(currentMatchDate.getMonth() + 1).padStart(2, '0');
@@ -285,11 +286,11 @@ async function loadRecentMatches() {
         if (Array.isArray(matches) && matches.length > 0) {
             container.innerHTML = matches.slice(0, 12).map(match => createMatchCard(match)).join('');
         } else {
-            container.innerHTML = '<p class="loading">No matches found for this date</p>';
+            container.innerHTML = '<p class="loading">Матчи на эту дату не найдены</p>';
         }
     } catch (error) {
-        console.error('Error loading matches:', error);
-        container.innerHTML = '<p class="loading">Failed to load matches</p>';
+        console.error('Ошибка загрузки матчей:', error);
+        container.innerHTML = '<p class="loading">Не удалось загрузить матчи</p>';
     }
 }
 
@@ -305,40 +306,41 @@ async function loadFavorites() {
         let html = '';
         
         if (favPlayers?.length > 0) {
-            html += '<h3>Favorite Players</h3><div class="players-grid">';
+            html += '<h3>⭐ Избранные игроки</h3><div class="players-grid">';
             html += favPlayers.map(p => createPlayerCard(p)).join('');
             html += '</div>';
         }
         
         if (favTeams?.length > 0) {
-            html += '<h3>Favorite Teams</h3><div class="teams-grid">';
+            html += '<h3>🏆 Избранные команды</h3><div class="teams-grid">';
             html += favTeams.map(t => createTeamCard(t)).join('');
             html += '</div>';
         }
         
         if (favTournaments?.length > 0) {
-            html += '<h3>Favorite Tournaments</h3><div class="tournaments-grid">';
+            html += '<h3>🏅 Избранные турниры</h3><div class="tournaments-grid">';
             html += favTournaments.map(t => createTournamentCard(t)).join('');
             html += '</div>';
         }
 
         if (!html) {
-            html = '<p>No favorites yet. Search and add your favorite players, teams, and tournaments!</p>';
+            html = '<p class="empty-favorites">✨ Пока нет избранных. Найдите и добавьте игроков, команды и турниры.</p>';
         }
 
         container.innerHTML = html;
     } catch (error) {
-        console.error('Error loading favorites:', error);
+        console.error('Ошибка загрузки избранного:', error);
+        container.innerHTML = '<p class="error">Не удалось загрузить избранное</p>';
     }
 }
 
 function createMatchCard(match) {
     const date = new Date(match.date);
-    const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    const dateStr = date.toLocaleDateString();
+    const timeStr = date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+    const dateStr = date.toLocaleDateString('ru-RU');
     
-    const homeTeam = match.home_team?.name || 'Team A';
-    const awayTeam = match.away_team?.name || 'Team B';
+    const homeTeam = match.home_team?.name || 'Команда А';
+    const awayTeam = match.away_team?.name || 'Команда Б';
     const homeTeamLogo = match.home_team?.url_logo || '';
     const awayTeamLogo = match.away_team?.url_logo || '';
     const homeScore = match.home_team_score ?? 0;
@@ -349,13 +351,16 @@ function createMatchCard(match) {
     const tournamentLogo = match.tournament?.url_logo || '';
     
     let statusClass = '';
-    let statusText = status;
+    let statusText = '';
     if (status === 'Ended') {
         statusClass = 'status-ended';
-        statusText = '✓ Finished';
+        statusText = '✓ Завершен';
     } else if (status === 'Not started') {
         statusClass = 'status-scheduled';
-        statusText = '⏱ Scheduled';
+        statusText = '⏱ Запланирован';
+    } else if (status === 'In Progress' || status === 'Live') {
+        statusClass = 'status-live';
+        statusText = '🟢 В прямом эфире';
     }
     
     return `
@@ -363,7 +368,7 @@ function createMatchCard(match) {
             <div class="match-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     ${tournamentLogo ? `<img src="${tournamentLogo}" alt="${tournamentName}" style="height: 20px; width: 20px; object-fit: contain;">` : '🏆'}
-                    <span style="font-size: 0.8rem; color: #666;">${tournamentName}</span>
+                    <span style="font-size: 0.8rem; color: #666;">${tournamentName || 'Турнир'}</span>
                 </div>
                 <div style="font-size: 0.8rem; color: #666;">${dateStr} • ${timeStr}</div>
             </div>
@@ -386,42 +391,51 @@ function createMatchCard(match) {
 }
 
 function createPlayerCard(player) {
-    const name = player.first_name || player.FirstName || player.name || 'Player';
-    const position = player.position || player.Position || 'N/A';
+    const name = player.first_name || player.FirstName || player.name || 'Игрок';
+    const position = player.position || player.Position || 'Н/Д';
     const id = player.athlete_id || player.AthleteID || player.id;
+    
+    const positionMap = {
+        'Goalkeeper': 'Вратарь',
+        'Defender': 'Защитник',
+        'Midfielder': 'Полузащитник',
+        'Forward': 'Нападающий'
+    };
+    
+    const russianPosition = positionMap[position] || position;
     
     return `
         <div class="card player-card" onclick="goToPlayer(${id})">
             <h3>${name}</h3>
-            <p>${position}</p>
+            <p>${russianPosition}</p>
             <div class="card-meta">
-                <span class="badge">${position}</span>
+                <span class="badge">${russianPosition}</span>
             </div>
         </div>
     `;
 }
 
 function createTeamCard(team) {
-    const name = team.name || team.Name || 'Team';
+    const name = team.name || team.Name || 'Команда';
     const id = team.team_id || team.TeamID || team.id;
     
     return `
         <div class="card team-card" onclick="goToTeam(${id})">
             <h3>${name}</h3>
-            <p>Football Club</p>
+            <p>⚽ Футбольный клуб</p>
         </div>
     `;
 }
 
 function createTournamentCard(tournament) {
-    const name = tournament.name || tournament.Name || 'Tournament';
+    const name = tournament.name || tournament.Name || 'Турнир';
     const season = tournament.season || tournament.Season || '';
     const id = tournament.tournament_id || tournament.TournamentID || tournament.id;
     
     return `
         <div class="card tournament-card" onclick="goToTournament(${id})">
             <h3>${name}</h3>
-            ${season ? `<p>Season ${season}</p>` : ''}
+            ${season ? `<p>📅 Сезон ${season}</p>` : ''}
         </div>
     `;
 }

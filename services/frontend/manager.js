@@ -1,4 +1,4 @@
-// Manager page functionality
+// Функционал страницы тренера
 let managerId;
 let isFavorite = false;
 let currentStatsData = null;
@@ -63,14 +63,14 @@ async function loadManagerStatsWithParams(params = {}) {
         url += `?${queryParams.join('&')}`;
     }
     
-    console.log('Loading manager stats from:', url);
+    console.log('Загрузка статистики тренера из:', url);
     try {
         const response = await fetch(url);
         if (response.ok) {
             return await response.json();
         }
     } catch (error) {
-        console.error('Error loading manager stats:', error);
+        console.error('Ошибка загрузки статистики тренера:', error);
     }
     return null;
 }
@@ -80,7 +80,7 @@ function renderAggregatedStats(statsData) {
     const statsGrid = document.getElementById('manager-stats-grid');
     
     if (!statsData || !statsData.full) {
-        statsGrid.innerHTML = '<p>No stats available</p>';
+        statsGrid.innerHTML = '<p>Статистика недоступна</p>';
         return;
     }
     
@@ -88,30 +88,30 @@ function renderAggregatedStats(statsData) {
     
     // Группируем статистику по категориям
     const generalStats = [
-        { key: 'total_matches', label: 'Matches' },
-        { key: 'win_percentage', label: 'Win %', multiply: 100, suffix: '%' },
-        { key: 'avg_points', label: 'Avg Points' }
+        { key: 'total_matches', label: 'Матчи' },
+        { key: 'win_percentage', label: 'Побед %', multiply: 100, suffix: '%' },
+        { key: 'avg_points', label: 'Ср. очков' }
     ];
     
     const attackingStats = [
-        { key: 'goals', label: 'Goals' },
-        { key: 'goals_per_90', label: 'Goals/90' },
-        { key: 'total_shots', label: 'Total Shots' },
-        { key: 'shots_on_goal', label: 'Shots on Goal' }
+        { key: 'goals', label: 'Голы' },
+        { key: 'goals_per_90', label: 'Голов/90' },
+        { key: 'total_shots', label: 'Всего ударов' },
+        { key: 'shots_on_goal', label: 'Ударов в створ' }
     ];
     
     const defensiveStats = [
-        { key: 'goals_conceded', label: 'Goals Conceded' },
-        { key: 'goals_conceded_per_90', label: 'Conceded/90' },
-        { key: 'yellow_cards', label: 'Yellow Cards' },
-        { key: 'red_cards', label: 'Red Cards' }
+        { key: 'goals_conceded', label: 'Пропущено голов' },
+        { key: 'goals_conceded_per_90', label: 'Пропущено/90' },
+        { key: 'yellow_cards', label: 'Желтые карточки' },
+        { key: 'red_cards', label: 'Красные карточки' }
     ];
     
     const possessionStats = [
-        { key: 'average_ball_possession', label: 'Possession %', suffix: '%' },
-        { key: 'average_pass_accuracy', label: 'Pass Accuracy %', multiply: 100, suffix: '%' },
-        { key: 'total_passes', label: 'Total Passes' },
-        { key: 'complete_passes', label: 'Complete Passes' }
+        { key: 'average_ball_possession', label: 'Владение %', suffix: '%' },
+        { key: 'average_pass_accuracy', label: 'Точность пасов %', multiply: 100, suffix: '%' },
+        { key: 'total_passes', label: 'Всего пасов' },
+        { key: 'complete_passes', label: 'Точных пасов' }
     ];
     
     function formatValue(value, stat) {
@@ -139,7 +139,7 @@ function renderAggregatedStats(statsData) {
     // Общая статистика
     html += `
         <div>
-            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">📊 General</h3>
+            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">📊 Общая</h3>
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
                 ${generalStats.map(stat => {
                     const value = stats[stat.key];
@@ -157,7 +157,7 @@ function renderAggregatedStats(statsData) {
     // Атакующая статистика
     html += `
         <div>
-            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">⚽ Attacking</h3>
+            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">⚽ Атака</h3>
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
                 ${attackingStats.map(stat => {
                     const value = stats[stat.key];
@@ -175,7 +175,7 @@ function renderAggregatedStats(statsData) {
     // Оборонительная статистика
     html += `
         <div>
-            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">🛡️ Defensive</h3>
+            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">🛡️ Защита</h3>
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
                 ${defensiveStats.map(stat => {
                     const value = stats[stat.key];
@@ -193,7 +193,7 @@ function renderAggregatedStats(statsData) {
     // Владение и пасы
     html += `
         <div>
-            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">🎯 Possession & Passing</h3>
+            <h3 style="margin-bottom: 0.75rem; color: #2c3e50;">🎯 Владение и пасы</h3>
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
                 ${possessionStats.map(stat => {
                     const value = stats[stat.key];
@@ -294,7 +294,7 @@ function sortSeasonsData(column) {
             case 'season':
                 aVal = a.season;
                 bVal = b.season;
-                return currentSeasonsSort.direction === 'asc' 
+                return currentTeamsSort.direction === 'asc' 
                     ? aVal.localeCompare(bVal) 
                     : bVal.localeCompare(aVal);
             case 'matches':
@@ -353,15 +353,15 @@ function renderTeamsTable(data) {
             <table class="manager-stats-table sortable-table">
                 <thead>
                     <tr>
-                        <th data-sort="team" onclick="sortTeamsData('team')">Team <span class="sort-icon">${currentTeamsSort.column === 'team' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="matches" onclick="sortTeamsData('matches')">Matches <span class="sort-icon">${currentTeamsSort.column === 'matches' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="win_rate" onclick="sortTeamsData('win_rate')">Win % <span class="sort-icon">${currentTeamsSort.column === 'win_rate' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="avg_points" onclick="sortTeamsData('avg_points')">Avg Points <span class="sort-icon">${currentTeamsSort.column === 'avg_points' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="possession" onclick="sortTeamsData('possession')">Possession <span class="sort-icon">${currentTeamsSort.column === 'possession' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="goals" onclick="sortTeamsData('goals')">Goals <span class="sort-icon">${currentTeamsSort.column === 'goals' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="goals_per_90" onclick="sortTeamsData('goals_per_90')">Goals/90 <span class="sort-icon">${currentTeamsSort.column === 'goals_per_90' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="conceded" onclick="sortTeamsData('conceded')">Conceded <span class="sort-icon">${currentTeamsSort.column === 'conceded' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="pass_acc" onclick="sortTeamsData('pass_acc')">Pass Acc <span class="sort-icon">${currentTeamsSort.column === 'pass_acc' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="team" onclick="sortTeamsData('team')">Команда <span class="sort-icon">${currentTeamsSort.column === 'team' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="matches" onclick="sortTeamsData('matches')">Матчи <span class="sort-icon">${currentTeamsSort.column === 'matches' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="win_rate" onclick="sortTeamsData('win_rate')">Побед % <span class="sort-icon">${currentTeamsSort.column === 'win_rate' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="avg_points" onclick="sortTeamsData('avg_points')">Ср. очков <span class="sort-icon">${currentTeamsSort.column === 'avg_points' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="possession" onclick="sortTeamsData('possession')">Владение <span class="sort-icon">${currentTeamsSort.column === 'possession' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="goals" onclick="sortTeamsData('goals')">Голы <span class="sort-icon">${currentTeamsSort.column === 'goals' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="goals_per_90" onclick="sortTeamsData('goals_per_90')">Голов/90 <span class="sort-icon">${currentTeamsSort.column === 'goals_per_90' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="conceded" onclick="sortTeamsData('conceded')">Пропущено <span class="sort-icon">${currentTeamsSort.column === 'conceded' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="pass_acc" onclick="sortTeamsData('pass_acc')">Точность пасов <span class="sort-icon">${currentTeamsSort.column === 'pass_acc' ? (currentTeamsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -407,15 +407,15 @@ function renderSeasonsTable(data) {
             <table class="manager-stats-table sortable-table">
                 <thead>
                     <tr>
-                        <th data-sort="season" onclick="sortSeasonsData('season')">Season <span class="sort-icon">${currentSeasonsSort.column === 'season' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="matches" onclick="sortSeasonsData('matches')">Matches <span class="sort-icon">${currentSeasonsSort.column === 'matches' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="win_rate" onclick="sortSeasonsData('win_rate')">Win % <span class="sort-icon">${currentSeasonsSort.column === 'win_rate' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="avg_points" onclick="sortSeasonsData('avg_points')">Avg Points <span class="sort-icon">${currentSeasonsSort.column === 'avg_points' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="possession" onclick="sortSeasonsData('possession')">Possession <span class="sort-icon">${currentSeasonsSort.column === 'possession' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="goals" onclick="sortSeasonsData('goals')">Goals <span class="sort-icon">${currentSeasonsSort.column === 'goals' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="goals_per_90" onclick="sortSeasonsData('goals_per_90')">Goals/90 <span class="sort-icon">${currentSeasonsSort.column === 'goals_per_90' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="conceded" onclick="sortSeasonsData('conceded')">Conceded <span class="sort-icon">${currentSeasonsSort.column === 'conceded' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
-                        <th data-sort="pass_acc" onclick="sortSeasonsData('pass_acc')">Pass Acc <span class="sort-icon">${currentSeasonsSort.column === 'pass_acc' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="season" onclick="sortSeasonsData('season')">Сезон <span class="sort-icon">${currentSeasonsSort.column === 'season' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="matches" onclick="sortSeasonsData('matches')">Матчи <span class="sort-icon">${currentSeasonsSort.column === 'matches' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="win_rate" onclick="sortSeasonsData('win_rate')">Побед % <span class="sort-icon">${currentSeasonsSort.column === 'win_rate' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="avg_points" onclick="sortSeasonsData('avg_points')">Ср. очков <span class="sort-icon">${currentSeasonsSort.column === 'avg_points' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="possession" onclick="sortSeasonsData('possession')">Владение <span class="sort-icon">${currentSeasonsSort.column === 'possession' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="goals" onclick="sortSeasonsData('goals')">Голы <span class="sort-icon">${currentSeasonsSort.column === 'goals' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="goals_per_90" onclick="sortSeasonsData('goals_per_90')">Голов/90 <span class="sort-icon">${currentSeasonsSort.column === 'goals_per_90' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="conceded" onclick="sortSeasonsData('conceded')">Пропущено <span class="sort-icon">${currentSeasonsSort.column === 'conceded' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
+                        <th data-sort="pass_acc" onclick="sortSeasonsData('pass_acc')">Точность пасов <span class="sort-icon">${currentSeasonsSort.column === 'pass_acc' ? (currentSeasonsSort.direction === 'asc' ? '🔼' : '🔽') : '↕️'}</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -454,7 +454,7 @@ function renderSeasonsTable(data) {
 
 function renderStatsByTeam(statsData) {
     if (!statsData || typeof statsData !== 'object' || Object.keys(statsData).length === 0) {
-        document.getElementById('manager-stats-grid').innerHTML = '<p>No team stats available</p>';
+        document.getElementById('manager-stats-grid').innerHTML = '<p>Статистика по командам недоступна</p>';
         return;
     }
     
@@ -469,7 +469,7 @@ function renderStatsByTeam(statsData) {
 
 function renderStatsBySeason(statsData) {
     if (!statsData || typeof statsData !== 'object' || Object.keys(statsData).length === 0) {
-        document.getElementById('manager-stats-grid').innerHTML = '<p>No season stats available</p>';
+        document.getElementById('manager-stats-grid').innerHTML = '<p>Статистика по сезонам недоступна</p>';
         return;
     }
     
@@ -485,7 +485,7 @@ function renderStatsBySeason(statsData) {
 async function updateStats(type) {
     currentStatsType = type;
     const statsGrid = document.getElementById('manager-stats-grid');
-    statsGrid.innerHTML = '<div class="loading-spinner">Loading statistics...</div>';
+    statsGrid.innerHTML = '<div class="loading-spinner">Загрузка статистики...</div>';
     
     let params = {};
     if (type === 'by_team') {
@@ -505,44 +505,44 @@ async function updateStats(type) {
             renderAggregatedStats(stats);
         }
     } else {
-        statsGrid.innerHTML = '<p>No stats available for selected view</p>';
+        statsGrid.innerHTML = '<p>Статистика для выбранного режима недоступна</p>';
     }
 }
 
 async function loadManagerData() {
     try {
-        console.log('Loading manager data for ID:', managerId);
+        console.log('Загрузка данных тренера для ID:', managerId);
         
         const [details, stats, teams, fixtures] = await Promise.all([
             managerAPI.getDetails(managerId).catch(e => {
-                console.error('Details error:', e);
+                console.error('Ошибка деталей:', e);
                 return null;
             }),
             managerAPI.getStats(managerId).catch(e => {
-                console.error('Stats error:', e);
+                console.error('Ошибка статистики:', e);
                 return null;
             }),
             managerAPI.getTeams(managerId).catch(e => {
-                console.error('Teams error:', e);
+                console.error('Ошибка команд:', e);
                 return null;
             }),
             managerAPI.getFixtures(managerId).catch(e => {
-                console.error('Fixtures error:', e);
+                console.error('Ошибка матчей:', e);
                 return null;
             }),
         ]);
 
-        console.log('Manager details:', details);
-        console.log('Manager stats:', stats);
-        console.log('Manager teams:', teams);
-        console.log('Manager fixtures:', fixtures);
+        console.log('Детали тренера:', details);
+        console.log('Статистика тренера:', stats);
+        console.log('Команды тренера:', teams);
+        console.log('Матчи тренера:', fixtures);
 
         if (!details) {
-            document.getElementById('manager-detail').innerHTML = '<p class="loading">Manager not found</p>';
+            document.getElementById('manager-detail').innerHTML = '<p class="loading">Тренер не найден</p>';
             return;
         }
 
-        const managerName = `${details.first_name || ''} ${details.last_name || ''}`.trim() || 'Manager';
+        const managerName = `${details.first_name || ''} ${details.last_name || ''}`.trim() || 'Тренер';
         const photo = details.url_photo || '';
         const nationFlag = details.nation?.url_flag || '';
         const nationName = details.nation?.name || '';
@@ -560,7 +560,7 @@ async function loadManagerData() {
         currentStatsData = stats;
         renderAggregatedStats(stats);
 
-        // Teams
+        // Команды
         if (teams && typeof teams === 'object' && Object.keys(teams).length > 0) {
             const list = document.getElementById('teams-list');
             const teamsArray = [];
@@ -571,7 +571,7 @@ async function loadManagerData() {
                         teamsArray.push({ name: teamName, season: season });
                     });
                 } else {
-                    teamsArray.push({ name: teamName, season: seasons || 'Current' });
+                    teamsArray.push({ name: teamName, season: seasons || 'Текущий' });
                 }
             }
             
@@ -582,15 +582,15 @@ async function loadManagerData() {
                 </div>
             `).join('');
         } else {
-            document.getElementById('teams-list').innerHTML = '<p>No team history available</p>';
+            document.getElementById('teams-list').innerHTML = '<p>История команд недоступна</p>';
         }
 
-        // Fixtures
+        // Матчи
         if (fixtures && Array.isArray(fixtures)) {
             const list = document.getElementById('fixtures-list');
             list.innerHTML = fixtures.slice(0, 20).map(f => {
-                const homeTeam = f.home_team?.name || 'Home';
-                const awayTeam = f.away_team?.name || 'Away';
+                const homeTeam = f.home_team?.name || 'Хозяева';
+                const awayTeam = f.away_team?.name || 'Гости';
                 const homeLogo = f.home_team?.url_logo || '';
                 const awayLogo = f.away_team?.url_logo || '';
                 const homeScore = f.home_team_score ?? '-';
@@ -601,19 +601,22 @@ async function loadManagerData() {
                 const tournament = f.tournament?.name || '';
                 
                 let statusClass = '';
-                let statusText = status;
+                let statusText = '';
                 if (status === 'Ended') {
                     statusClass = 'status-ended';
-                    statusText = '✓ Finished';
+                    statusText = '✓ Завершен';
                 } else if (status === 'Not started') {
                     statusClass = 'status-scheduled';
-                    statusText = '⏱ Scheduled';
+                    statusText = '⏱ Запланирован';
+                } else if (status === 'In Progress' || status === 'Live') {
+                    statusClass = 'status-live';
+                    statusText = '🟢 В прямом эфире';
                 }
                 
                 return `
                     <div class="card match-card" onclick="goToMatch(${matchId})">
                         <div class="match-header">
-                            <span>${date.toLocaleDateString()}</span>
+                            <span>${date.toLocaleDateString('ru-RU')}</span>
                             <span>${escapeHtml(tournament)}</span>
                         </div>
                         <div class="match-score">
@@ -634,7 +637,7 @@ async function loadManagerData() {
                 `;
             }).join('');
         } else {
-            document.getElementById('fixtures-list').innerHTML = '<p>No fixtures available</p>';
+            document.getElementById('fixtures-list').innerHTML = '<p>Матчи недоступны</p>';
         }
         
         if (TokenManager.hasToken()) {
@@ -644,17 +647,17 @@ async function loadManagerData() {
                     isFavorite = favorites.some(f => f.manager_id === parseInt(managerId));
                     const btn = document.getElementById('fav-btn');
                     if (btn) {
-                        btn.textContent = isFavorite ? '★ Remove from Favorites' : '★ Add to Favorites';
+                        btn.textContent = isFavorite ? '★ Удалить из избранного' : '★ Добавить в избранное';
                     }
                 }
             } catch (e) {
-                console.error('Error checking favorites:', e);
+                console.error('Ошибка проверки избранного:', e);
             }
         }
         
     } catch (error) {
-        console.error('Error loading manager data:', error);
-        document.getElementById('manager-detail').innerHTML = '<p class="loading">Error loading manager data. Please try again.</p>';
+        console.error('Ошибка загрузки данных тренера:', error);
+        document.getElementById('manager-detail').innerHTML = '<p class="loading">Ошибка загрузки данных тренера. Пожалуйста, попробуйте снова.</p>';
     }
 }
 
@@ -686,14 +689,14 @@ async function toggleFavorite() {
         if (isFavorite) {
             await managerAPI.removeFavorite(managerId);
             isFavorite = false;
-            btn.textContent = '★ Add to Favorites';
+            btn.textContent = '★ Добавить в избранное';
         } else {
             await managerAPI.addFavorite(managerId);
             isFavorite = true;
-            btn.textContent = '★ Remove from Favorites';
+            btn.textContent = '★ Удалить из избранного';
         }
     } catch (error) {
-        console.error('Error toggling favorite:', error);
+        console.error('Ошибка переключения избранного:', error);
     }
 }
 

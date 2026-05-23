@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Match - Sports Analytics</title>
+    <title>Матч - Футбольная аналитика</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-container">
             <div class="logo">
-                <h2><a href="/" style="text-decoration:none; color:#2c3e50;">⚽ Sports Analytics</a></h2>
+                <h2><a href="/" style="text-decoration:none; color:#2c3e50;">⚽ Футбольная аналитика</a></h2>
             </div>
             <div class="nav-menu">
-                <a href="/" class="nav-link">Home</a>
-                <a href="/search" class="nav-link">Search</a>
+                <a href="/" class="nav-link">Главная</a>
+                <a href="/search" class="nav-link">Поиск</a>
                 <div class="auth-section">
                     <span id="user-name" style="display:none; margin-right: 15px;"></span>
-                    <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Login</button>
-                    <button id="logout-btn" class="btn-secondary" style="display:none;" onclick="logout()">Logout</button>
+                    <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Войти</button>
+                    <button id="logout-btn" class="btn-secondary" style="display:none;" onclick="logout()">Выйти</button>
                 </div>
             </div>
         </div>
@@ -28,22 +28,22 @@
         <div class="auth-container">
             <div class="close-btn" onclick="toggleAuthPanel()">✕</div>
             <div class="auth-tabs">
-                <button class="tab-btn active" onclick="switchTab('login')">Login</button>
-                <button class="tab-btn" onclick="switchTab('register')">Register</button>
+                <button class="tab-btn active" onclick="switchTab('login', event)">Вход</button>
+                <button class="tab-btn" onclick="switchTab('register', event)">Регистрация</button>
             </div>
             
             <form id="login-form" class="tab-content active">
-                <input type="text" id="login-username" placeholder="Username" required>
-                <input type="password" id="login-password" placeholder="Password" required>
-                <button type="submit" class="btn-primary">Login</button>
+                <input type="text" id="login-username" placeholder="Логин" required>
+                <input type="password" id="login-password" placeholder="Пароль" required>
+                <button type="submit" class="btn-primary">Войти</button>
                 <div id="login-error" class="error-msg"></div>
             </form>
 
             <form id="register-form" class="tab-content">
-                <input type="text" id="register-username" placeholder="Username" required>
-                <input type="password" id="register-password" placeholder="Password" required>
-                <input type="password" id="register-password-confirm" placeholder="Confirm Password" required>
-                <button type="submit" class="btn-primary">Register</button>
+                <input type="text" id="register-username" placeholder="Логин" required>
+                <input type="password" id="register-password" placeholder="Пароль" required>
+                <input type="password" id="register-password-confirm" placeholder="Подтвердите пароль" required>
+                <button type="submit" class="btn-primary">Регистрация</button>
                 <div id="register-error" class="error-msg"></div>
             </form>
         </div>
@@ -54,30 +54,30 @@
             <div class="detail-header">
                 <div class="detail-title" style="text-align: center; width: 100%;">
                     <div style="margin-bottom: 1rem;">
-                        <span id="match-date" style="color: #7f8c8d; font-size: 1rem;">Loading...</span>
+                        <span id="match-date" style="color: #7f8c8d; font-size: 1rem;">Загрузка...</span>
                     </div>
                     <div style="display: flex; justify-content: center; gap: 2rem; align-items: center; margin-bottom: 1rem;">
                         <div style="text-align: center;">
-                            <h2 id="home-team" onclick="goToTeam(this.dataset.id)" style="cursor: pointer;">Home</h2>
+                            <h2 id="home-team" onclick="goToTeam(this.dataset.id)" style="cursor: pointer;">Хозяева</h2>
                         </div>
                         <div style="font-size: 2rem; font-weight: bold;">
                             <span id="match-score">- : -</span>
                         </div>
                         <div style="text-align: center;">
-                            <h2 id="away-team" onclick="goToTeam(this.dataset.id)" style="cursor: pointer;">Away</h2>
+                            <h2 id="away-team" onclick="goToTeam(this.dataset.id)" style="cursor: pointer;">Гости</h2>
                         </div>
                     </div>
                     <div class="detail-meta" style="justify-content: center;">
-                        <span id="match-status" class="badge status">Scheduled</span>
+                        <span id="match-status" class="badge status">Запланирован</span>
                     </div>
                 </div>
             </div>
 
             <div class="tabs">
-                <button class="tab active" onclick="switchMatchTab('overview')">Overview</button>
-                <button class="tab" onclick="switchMatchTab('players')">Players</button>
-                <button class="tab" onclick="switchMatchTab('goalies')">Goalies</button>
-                <button class="tab" onclick="switchMatchTab('team-stats')">Team Stats</button>
+                <button class="tab active" onclick="switchMatchTab('overview')">Обзор</button>
+                <button class="tab" onclick="switchMatchTab('players')">Игроки</button>
+                <button class="tab" onclick="switchMatchTab('goalies')">Вратари</button>
+                <button class="tab" onclick="switchMatchTab('team-stats')">Статистика команд</button>
             </div>
 
             <div id="match-overview" class="tab-pane active">
@@ -87,44 +87,44 @@
             <div id="match-players" class="tab-pane">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; overflow-x: auto;">
                     <div>
-                        <h3>Home Players</h3>
+                        <h3>Игроки хозяев</h3>
                         <table class="table sortable-table" id="home-players-table" style="min-width: 900px;">
                             <thead>
                                 <tr>
-                                    <th class="sortable-th" data-sort="name" onclick="sortHomePlayers('name')">Player <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="goals" onclick="sortHomePlayers('goals')">G <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="assists" onclick="sortHomePlayers('assists')">A <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="shots" onclick="sortHomePlayers('shots')">Shots <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="shots_on_target" onclick="sortHomePlayers('shots_on_target')">SoT <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="key_passes" onclick="sortHomePlayers('key_passes')">KP <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="tackles" onclick="sortHomePlayers('tackles')">Tkl <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="interceptions" onclick="sortHomePlayers('interceptions')">Int <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="fouls" onclick="sortHomePlayers('fouls')">Fouls <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="yellow_cards" onclick="sortHomePlayers('yellow_cards')">YC <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="rating" onclick="sortHomePlayers('rating')">Rating <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="minutes" onclick="sortHomePlayers('minutes')">Mins <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortHomePlayers('name')">Игрок <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="goals" onclick="sortHomePlayers('goals')">Г <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="assists" onclick="sortHomePlayers('assists')">П <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots" onclick="sortHomePlayers('shots')">Удары <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots_on_target" onclick="sortHomePlayers('shots_on_target')">В створ <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="key_passes" onclick="sortHomePlayers('key_passes')">КП <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="tackles" onclick="sortHomePlayers('tackles')">Отборы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="interceptions" onclick="sortHomePlayers('interceptions')">Перехв <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="fouls" onclick="sortHomePlayers('fouls')">Фолы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="yellow_cards" onclick="sortHomePlayers('yellow_cards')">ЖК <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortHomePlayers('rating')">Рейтинг <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="minutes" onclick="sortHomePlayers('minutes')">Мин <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="home-players-tbody"></tbody>
                         </table>
                     </div>
                     <div>
-                        <h3>Away Players</h3>
+                        <h3>Игроки гостей</h3>
                         <table class="table sortable-table" id="away-players-table" style="min-width: 900px;">
                             <thead>
                                 <tr>
-                                    <th class="sortable-th" data-sort="name" onclick="sortAwayPlayers('name')">Player <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="goals" onclick="sortAwayPlayers('goals')">G <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="assists" onclick="sortAwayPlayers('assists')">A <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="shots" onclick="sortAwayPlayers('shots')">Shots <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="shots_on_target" onclick="sortAwayPlayers('shots_on_target')">SoT <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="key_passes" onclick="sortAwayPlayers('key_passes')">KP <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="tackles" onclick="sortAwayPlayers('tackles')">Tkl <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="interceptions" onclick="sortAwayPlayers('interceptions')">Int <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="fouls" onclick="sortAwayPlayers('fouls')">Fouls <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="yellow_cards" onclick="sortAwayPlayers('yellow_cards')">YC <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="rating" onclick="sortAwayPlayers('rating')">Rating <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="minutes" onclick="sortAwayPlayers('minutes')">Mins <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortAwayPlayers('name')">Игрок <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="goals" onclick="sortAwayPlayers('goals')">Г <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="assists" onclick="sortAwayPlayers('assists')">П <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots" onclick="sortAwayPlayers('shots')">Удары <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="shots_on_target" onclick="sortAwayPlayers('shots_on_target')">В створ <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="key_passes" onclick="sortAwayPlayers('key_passes')">КП <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="tackles" onclick="sortAwayPlayers('tackles')">Отборы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="interceptions" onclick="sortAwayPlayers('interceptions')">Перехв <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="fouls" onclick="sortAwayPlayers('fouls')">Фолы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="yellow_cards" onclick="sortAwayPlayers('yellow_cards')">ЖК <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortAwayPlayers('rating')">Рейтинг <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="minutes" onclick="sortAwayPlayers('minutes')">Мин <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="away-players-tbody"></tbody>
@@ -136,36 +136,36 @@
             <div id="match-goalies" class="tab-pane">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; overflow-x: auto;">
                     <div>
-                        <h3>Home Goalies</h3>
+                        <h3>Вратари хозяев</h3>
                         <table class="table sortable-table" id="home-goalies-table" style="min-width: 700px;">
                             <thead>
                                 <tr>
-                                    <th class="sortable-th" data-sort="name" onclick="sortHomeGoalies('name')">Goalie <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="saves" onclick="sortHomeGoalies('saves')">Saves <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="conceded" onclick="sortHomeGoalies('conceded')">Conceded <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="passes" onclick="sortHomeGoalies('passes')">Pass <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="passes_accuracy" onclick="sortHomeGoalies('passes_accuracy')">Acc% <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="penalty_saved" onclick="sortHomeGoalies('penalty_saved')">Pen Saved <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="penalty_conceded" onclick="sortHomeGoalies('penalty_conceded')">Pen Conc <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="rating" onclick="sortHomeGoalies('rating')">Rating <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortHomeGoalies('name')">Вратарь <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="saves" onclick="sortHomeGoalies('saves')">Сейвы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="conceded" onclick="sortHomeGoalies('conceded')">Пропущ <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes" onclick="sortHomeGoalies('passes')">Пасы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes_accuracy" onclick="sortHomeGoalies('passes_accuracy')">Точн% <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_saved" onclick="sortHomeGoalies('penalty_saved')">Пен сэйв <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_conceded" onclick="sortHomeGoalies('penalty_conceded')">Пен проп <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortHomeGoalies('rating')">Рейтинг <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="home-goalies-tbody"></tbody>
                         </table>
                     </div>
                     <div>
-                        <h3>Away Goalies</h3>
+                        <h3>Вратари гостей</h3>
                         <table class="table sortable-table" id="away-goalies-table" style="min-width: 700px;">
                             <thead>
                                 <tr>
-                                    <th class="sortable-th" data-sort="name" onclick="sortAwayGoalies('name')">Goalie <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="saves" onclick="sortAwayGoalies('saves')">Saves <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="conceded" onclick="sortAwayGoalies('conceded')">Conceded <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="passes" onclick="sortAwayGoalies('passes')">Pass <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="passes_accuracy" onclick="sortAwayGoalies('passes_accuracy')">Acc% <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="penalty_saved" onclick="sortAwayGoalies('penalty_saved')">Pen Saved <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="penalty_conceded" onclick="sortAwayGoalies('penalty_conceded')">Pen Conc <span class="sort-icon">↕️</span></th>
-                                    <th class="sortable-th" data-sort="rating" onclick="sortAwayGoalies('rating')">Rating <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="name" onclick="sortAwayGoalies('name')">Вратарь <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="saves" onclick="sortAwayGoalies('saves')">Сейвы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="conceded" onclick="sortAwayGoalies('conceded')">Пропущ <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes" onclick="sortAwayGoalies('passes')">Пасы <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="passes_accuracy" onclick="sortAwayGoalies('passes_accuracy')">Точн% <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_saved" onclick="sortAwayGoalies('penalty_saved')">Пен сэйв <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="penalty_conceded" onclick="sortAwayGoalies('penalty_conceded')">Пен проп <span class="sort-icon">↕️</span></th>
+                                    <th class="sortable-th" data-sort="rating" onclick="sortAwayGoalies('rating')">Рейтинг <span class="sort-icon">↕️</span></th>
                                 </tr>
                             </thead>
                             <tbody id="away-goalies-tbody"></tbody>
@@ -178,9 +178,9 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Stat</th>
-                            <th>Home</th>
-                            <th>Away</th>
+                            <th>Показатель</th>
+                            <th>Хозяева</th>
+                            <th>Гости</th>
                         </tr>
                     </thead>
                     <tbody id="team-stats-tbody"></tbody>
@@ -190,7 +190,7 @@
     </main>
 
     <footer class="footer">
-        <p>&copy; 2026 Sports Analytics. All rights reserved.</p>
+        <p>&copy; 2026 Футбольная аналитика. Все права защищены.</p>
     </footer>
 
     <script src="api.js"></script>

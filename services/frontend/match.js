@@ -1,4 +1,4 @@
-// Match page functionality
+// Функционал страницы матча
 let matchId;
 
 // Переменные для сортировки игроков
@@ -206,7 +206,7 @@ function renderHomeGoaliesTable() {
                               `<div style="width: 35px; height: 35px; background: #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center;">🧤</div>`}
                     <div>
                         <strong>${g.name}</strong>
-                        <div style="font-size: 0.7rem; color: #666;">Goalkeeper • ${g.minutes}' ${g.isStarter}</div>
+                        <div style="font-size: 0.7rem; color: #666;">Вратарь • ${g.minutes}' ${g.isStarter}</div>
                     </div>
                     </td>
                    <td style="text-align: center;">${g.saves}</td>
@@ -248,7 +248,7 @@ function renderAwayGoaliesTable() {
                               `<div style="width: 35px; height: 35px; background: #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center;">🧤</div>`}
                     <div>
                         <strong>${g.name}</strong>
-                        <div style="font-size: 0.7rem; color: #666;">Goalkeeper • ${g.minutes}' ${g.isStarter}</div>
+                        <div style="font-size: 0.7rem; color: #666;">Вратарь • ${g.minutes}' ${g.isStarter}</div>
                     </div>
                     </td>
                    <td style="text-align: center;">${g.saves}</td>
@@ -335,21 +335,21 @@ function getMatchStatusInfo(details) {
     }
     
     if (status === 'Live' || status === 'In Progress' || status === 'First Half' || status === 'Second Half') {
-        return { isFinished: false, isLive: true, isPending: false, message: '⚽ Match is currently in progress! Live updates coming soon.' };
+        return { isFinished: false, isLive: true, isPending: false, message: '⚽ Матч сейчас в прямом эфире! Скоро появятся обновления в реальном времени.' };
     }
     
     if (matchDate > now) {
         const timeUntil = Math.ceil((matchDate - now) / (1000 * 60));
         return { 
             isFinished: false, isLive: false, isPending: false, 
-            message: `⏰ Match starts in approximately ${timeUntil} minutes` 
+            message: `⏰ Матч начнется примерно через ${timeUntil} минут` 
         };
     }
     
     if (matchDate < now && status !== 'Ended') {
         return { 
             isFinished: false, isLive: false, isPending: true, 
-            message: '⏳ The match has ended. Statistics will be updated shortly. Please check back in a few minutes.' 
+            message: '⏳ Матч завершен. Статистика скоро появится. Пожалуйста, зайдите через несколько минут.' 
         };
     }
     
@@ -365,12 +365,12 @@ async function loadTournamentDetails(tournamentId) {
             return await response.json();
         }
     } catch (error) {
-        console.error('Error loading tournament details:', error);
+        console.error('Ошибка загрузки деталей турнира:', error);
     }
     return null;
 }
 
-// Функция отрисовки статистики в Overview
+// Функция отрисовки статистики в Обзоре
 function renderOverviewStats(teamStats, homeTeamName, awayTeamName, homeTeamLogo, awayTeamLogo) {
     const overviewDiv = document.getElementById('match-overview');
     if (!overviewDiv) return;
@@ -403,16 +403,16 @@ function renderOverviewStats(teamStats, homeTeamName, awayTeamName, homeTeamLogo
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 2rem;">
                 <div style="flex: 1; text-align: center;">
                     <div style="font-size: 2.5rem; font-weight: bold; color: #2c3e50;">${homeShots}</div>
-                    <div style="color: #666; font-size: 0.9rem;">Shots</div>
+                    <div style="color: #666; font-size: 0.9rem;">Удары</div>
                     <div style="font-size: 2rem; font-weight: bold; color: #2c3e50; margin-top: 1rem;">${homePossession}%</div>
-                    <div style="color: #666; font-size: 0.9rem;">Possession</div>
+                    <div style="color: #666; font-size: 0.9rem;">Владение</div>
                 </div>
                 <div style="font-size: 1.5rem; font-weight: bold; color: #3498db;">VS</div>
                 <div style="flex: 1; text-align: center;">
                     <div style="font-size: 2.5rem; font-weight: bold; color: #2c3e50;">${awayShots}</div>
-                    <div style="color: #666; font-size: 0.9rem;">Shots</div>
+                    <div style="color: #666; font-size: 0.9rem;">Удары</div>
                     <div style="font-size: 2rem; font-weight: bold; color: #2c3e50; margin-top: 1rem;">${awayPossession}%</div>
-                    <div style="color: #666; font-size: 0.9rem;">Possession</div>
+                    <div style="color: #666; font-size: 0.9rem;">Владение</div>
                 </div>
             </div>
             
@@ -420,53 +420,53 @@ function renderOverviewStats(teamStats, homeTeamName, awayTeamName, homeTeamLogo
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
                     <div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Shots on Goal</span>
+                            <span>Удары в створ</span>
                             <span style="font-weight: bold;">${homeShotsOnGoal}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Pass Accuracy</span>
+                            <span>Точность пасов</span>
                             <span style="font-weight: bold;">${homePassAccuracy}%</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Corners</span>
+                            <span>Угловые</span>
                             <span style="font-weight: bold;">${homeCorners}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Fouls</span>
+                            <span>Фолы</span>
                             <span style="font-weight: bold;">${homeFouls}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Yellow Cards</span>
+                            <span>Желтые карточки</span>
                             <span style="font-weight: bold;">${homeYellowCards}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
-                            <span>Red Cards</span>
+                            <span>Красные карточки</span>
                             <span style="font-weight: bold;">${homeRedCards}</span>
                         </div>
                     </div>
                     <div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Shots on Goal</span>
+                            <span>Удары в створ</span>
                             <span style="font-weight: bold;">${awayShotsOnGoal}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Pass Accuracy</span>
+                            <span>Точность пасов</span>
                             <span style="font-weight: bold;">${awayPassAccuracy}%</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Corners</span>
+                            <span>Угловые</span>
                             <span style="font-weight: bold;">${awayCorners}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Fouls</span>
+                            <span>Фолы</span>
                             <span style="font-weight: bold;">${awayFouls}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                            <span>Yellow Cards</span>
+                            <span>Желтые карточки</span>
                             <span style="font-weight: bold;">${awayYellowCards}</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
-                            <span>Red Cards</span>
+                            <span>Красные карточки</span>
                             <span style="font-weight: bold;">${awayRedCards}</span>
                         </div>
                     </div>
@@ -485,36 +485,36 @@ function renderOverviewStats(teamStats, homeTeamName, awayTeamName, homeTeamLogo
 
 async function loadMatchData() {
     try {
-        console.log('Loading match data for ID:', matchId);
+        console.log('Загрузка данных матча для ID:', matchId);
         
         const details = await fixtureAPI.getDetails(matchId).catch(e => {
-            console.error('Details error:', e);
+            console.error('Ошибка деталей:', e);
             return null;
         });
         
         const playersStats = await fixtureAPI.getPlayersStats(matchId).catch(e => {
-            console.error('Players stats error:', e);
+            console.error('Ошибка статистики игроков:', e);
             return null;
         });
         
         const goaliesStats = await fixtureAPI.getGoaliesStats(matchId).catch(e => {
-            console.error('Goalies stats error:', e);
+            console.error('Ошибка статистики вратарей:', e);
             return null;
         });
         
         const teamStats = await fixtureAPI.getTeamsStats(matchId).catch(e => {
-            console.error('Team stats error:', e);
+            console.error('Ошибка статистики команд:', e);
             return null;
         });
 
-        console.log('Match details:', details);
-        console.log('Players stats:', playersStats);
-        console.log('Goalies stats:', goaliesStats);
-        console.log('Team stats:', teamStats);
+        console.log('Детали матча:', details);
+        console.log('Статистика игроков:', playersStats);
+        console.log('Статистика вратарей:', goaliesStats);
+        console.log('Статистика команд:', teamStats);
 
         if (!details) {
             const detailDiv = document.getElementById('match-detail');
-            if (detailDiv) detailDiv.innerHTML = '<p class="loading">Match not found</p>';
+            if (detailDiv) detailDiv.innerHTML = '<p class="loading">Матч не найден</p>';
             return;
         }
 
@@ -523,7 +523,7 @@ async function loadMatchData() {
         const isLive = matchStatusInfo.isLive;
         const isPending = matchStatusInfo.isPending;
         
-        console.log('Match status info:', matchStatusInfo);
+        console.log('Информация о статусе матча:', matchStatusInfo);
 
         const homeTeamId = details.home_team?.team_id || details.home_team_id;
         const awayTeamId = details.away_team?.team_id || details.away_team_id;
@@ -534,14 +534,14 @@ async function loadMatchData() {
         
         if (homeTeamId) {
             homeTeamDetails = await teamAPI.getDetails(homeTeamId).catch(e => {
-                console.error('Home team details error:', e);
+                console.error('Ошибка деталей команды хозяев:', e);
                 return null;
             });
         }
         
         if (awayTeamId) {
             awayTeamDetails = await teamAPI.getDetails(awayTeamId).catch(e => {
-                console.error('Away team details error:', e);
+                console.error('Ошибка деталей команды гостей:', e);
                 return null;
             });
         }
@@ -563,20 +563,20 @@ async function loadMatchData() {
                 const probResponse = await fetch(probUrl);
                 if (probResponse.ok) {
                     matchProbabilities = await probResponse.json();
-                    console.log('Match probabilities:', matchProbabilities);
+                    console.log('Вероятности матча:', matchProbabilities);
                 }
             } catch (e) {
-                console.error('Error loading probabilities:', e);
+                console.error('Ошибка загрузки вероятностей:', e);
             }
             
             try {
                 const standingsData = await tournamentAPI.getTable(tournamentId);
                 if (standingsData && Array.isArray(standingsData)) {
                     tournamentStandings = standingsData;
-                    console.log('Tournament standings:', tournamentStandings);
+                    console.log('Турнирная таблица:', tournamentStandings);
                 }
             } catch (e) {
-                console.error('Error loading standings:', e);
+                console.error('Ошибка загрузки таблицы:', e);
             }
         }
         
@@ -592,12 +592,12 @@ async function loadMatchData() {
         }
         
         const playerIds = [...new Set(allPlayers.map(p => p.athlete?.athlete_id).filter(id => id && id > 0))];
-        console.log('Player IDs to fetch:', playerIds);
+        console.log('ID игроков для загрузки:', playerIds);
         
         const playerDetailsMap = new Map();
         for (const playerId of playerIds) {
             const playerDetails = await playerAPI.getDetails(playerId).catch(e => {
-                console.error(`Player ${playerId} details error:`, e);
+                console.error(`Ошибка деталей игрока ${playerId}:`, e);
                 return null;
             });
             if (playerDetails) {
@@ -605,14 +605,14 @@ async function loadMatchData() {
             }
         }
 
-        // Update header
-        const homeTeamName = homeTeamDetails?.name || details.home_team?.name || `Team ${homeTeamId}`;
-        const awayTeamName = awayTeamDetails?.name || details.away_team?.name || `Team ${awayTeamId}`;
+        // Обновляем заголовок
+        const homeTeamName = homeTeamDetails?.name || details.home_team?.name || `Команда ${homeTeamId}`;
+        const awayTeamName = awayTeamDetails?.name || details.away_team?.name || `Команда ${awayTeamId}`;
         const homeTeamLogo = homeTeamDetails?.url_logo || '';
         const awayTeamLogo = awayTeamDetails?.url_logo || '';
         const homeScore = details.home_team_score ?? details.home_score ?? 0;
         const awayScore = details.away_team_score ?? details.away_score ?? 0;
-        const round = details.round || 'N/A';
+        const round = details.round || 'Н/Д';
         const tournamentName = tournamentDetails?.name || details.tournament?.name || '';
         const tournamentLogo = tournamentDetails?.url_logo || details.tournament?.url_logo || '';
 
@@ -642,27 +642,27 @@ async function loadMatchData() {
         if (matchScoreEl) matchScoreEl.textContent = `${homeScore} : ${awayScore}`;
         
         const matchDate = details.date ? new Date(details.date) : new Date();
-        const dateStr = matchDate.toLocaleDateString() + ' ' + matchDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        const dateStr = matchDate.toLocaleDateString('ru-RU') + ' ' + matchDate.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
         
         const tournamentInfoHtml = `
             <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 0.5rem;">
                 ${tournamentLogo ? `<img src="${tournamentLogo}" alt="${tournamentName}" style="height: 25px;">` : '🏆'}
                 <span>${tournamentName}</span>
                 <span>•</span>
-                <span>Round ${round}</span>
+                <span>Тур ${round}</span>
             </div>
         `;
         
         const dateElement = document.getElementById('match-date');
         if (dateElement) dateElement.innerHTML = `${dateStr}<br>${tournamentInfoHtml}`;
         
-        let statusText = details.status || 'Scheduled';
+        let statusText = details.status || 'Запланирован';
         if (isLive) {
-            statusText = '🔴 LIVE - Match in progress';
+            statusText = '🔴 ПРЯМОЙ ЭФИР - Матч в процессе';
         } else if (isPending) {
-            statusText = '⏳ Match ended - Awaiting statistics update';
+            statusText = '⏳ Матч завершен - Ожидается обновление статистики';
         } else if (!isFinished && matchDate > new Date()) {
-            statusText = '📅 Upcoming match';
+            statusText = '📅 Предстоящий матч';
         }
         const statusEl = document.getElementById('match-status');
         if (statusEl) statusEl.textContent = statusText;
@@ -690,7 +690,7 @@ async function loadMatchData() {
             if (oldAwayTeamStats) oldAwayTeamStats.remove();
         }
         
-        // Отрисовка статистики в Overview
+        // Отрисовка статистики в Обзоре
         if (teamStats && (isFinished || isLive) && overviewDiv) {
             renderOverviewStats(teamStats, homeTeamName, awayTeamName, homeTeamLogo, awayTeamLogo);
         }
@@ -700,20 +700,20 @@ async function loadMatchData() {
         if (isLive) {
             infoMessageHtml = `
                 <div class="info-message live" style="background: #ff4757; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; text-align: center; animation: pulse 2s infinite;">
-                    🔴 LIVE! The match is currently in progress. Follow the action in real-time!
+                    🔴 ПРЯМОЙ ЭФИР! Матч сейчас в процессе. Следите за событиями в реальном времени!
                 </div>
             `;
         } else if (isPending) {
             infoMessageHtml = `
                 <div class="info-message pending" style="background: #ffa502; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; text-align: center;">
-                    ⏳ The match has ended. Statistics will be updated shortly. Please check back in a few minutes.
+                    ⏳ Матч завершен. Статистика скоро появится. Пожалуйста, зайдите через несколько минут.
                 </div>
             `;
         } else if (!isFinished && matchDate > new Date()) {
             const timeUntil = Math.ceil((matchDate - new Date()) / (1000 * 60));
             infoMessageHtml = `
                 <div class="info-message upcoming" style="background: #1e3799; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; text-align: center;">
-                    📅 Match starts in approximately ${timeUntil} minutes. Check back for live updates!
+                    📅 Матч начнется примерно через ${timeUntil} минут. Зайдите позже для просмотра обновлений в реальном времени!
                 </div>
             `;
         }
@@ -732,47 +732,47 @@ async function loadMatchData() {
             
             const probabilitiesHtml = `
                 <div class="probabilities-section" style="margin-top: 1rem; padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
-                    <h3 style="text-align: center; margin-bottom: 1rem;">🎯 Match Prediction</h3>
+                    <h3 style="text-align: center; margin-bottom: 1rem;">🎯 Прогноз на матч</h3>
                     <div style="display: flex; justify-content: space-around; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
                         <div class="probability-card" style="text-align: center; flex: 1; min-width: 100px; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 1rem;">
                             <div class="probability-value" style="font-size: 2rem; font-weight: bold;">${homeProb.toFixed(1)}%</div>
-                            <div class="probability-label">🏠 Home Win</div>
+                            <div class="probability-label">🏠 Победа хозяев</div>
                         </div>
                         <div class="probability-card" style="text-align: center; flex: 1; min-width: 100px; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 1rem;">
                             <div class="probability-value" style="font-size: 2rem; font-weight: bold;">${drawProb.toFixed(1)}%</div>
-                            <div class="probability-label">🤝 Draw</div>
+                            <div class="probability-label">🤝 Ничья</div>
                         </div>
                         <div class="probability-card" style="text-align: center; flex: 1; min-width: 100px; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 1rem;">
                             <div class="probability-value" style="font-size: 2rem; font-weight: bold;">${awayProb.toFixed(1)}%</div>
-                            <div class="probability-label">✈️ Away Win</div>
+                            <div class="probability-label">✈️ Победа гостей</div>
                         </div>
                     </div>
                     <div style="font-size: 0.8rem; text-align: center; margin-top: 1rem; opacity: 0.8;">
-                        📊 Model: ${matchProbabilities.model || 'Poisson'} | Expected goals: 🏠 ${matchProbabilities.lambda_home?.toFixed(2) || '?'} - ${matchProbabilities.lambda_away?.toFixed(2) || '?'} ✈️
+                        📊 Модель: ${matchProbabilities.model || 'Пуассон'} | Ожидаемые голы: 🏠 ${matchProbabilities.lambda_home?.toFixed(2) || '?'} - ${matchProbabilities.lambda_away?.toFixed(2) || '?'} ✈️
                     </div>
                 </div>
             `;
             overviewDiv.insertAdjacentHTML('beforeend', probabilitiesHtml);
         }
         
-        // Таблица турнира для предстоящих матчей
+        // Турнирная таблица для предстоящих матчей
         if (!isFinished && !isLive && !isPending && tournamentStandings && tournamentStandings.length > 0 && overviewDiv) {
             const standingsHtml = `
                 <div class="standings-preview" style="margin-top: 2rem;">
-                    <h3>🏆 Tournament Standings</h3>
+                    <h3>🏆 Турнирная таблица</h3>
                     <div style="overflow-x: auto;">
                         <table class="table" style="min-width: 600px;">
                             <thead>
                                 <tr>
-                                    <th>Pos</th>
-                                    <th>Team</th>
-                                    <th>P</th>
-                                    <th>W</th>
-                                    <th>D</th>
-                                    <th>L</th>
-                                    <th>GF</th>
-                                    <th>GA</th>
-                                    <th>Pts</th>
+                                    <th>Место</th>
+                                    <th>Команда</th>
+                                    <th>И</th>
+                                    <th>В</th>
+                                    <th>Н</th>
+                                    <th>П</th>
+                                    <th>З</th>
+                                    <th>П</th>
+                                    <th>О</th>
                                 </tr>
                             </thead>
                             <tbody id="standings-preview-tbody"></tbody>
@@ -786,7 +786,7 @@ async function loadMatchData() {
             if (standingsTbody) {
                 standingsTbody.innerHTML = tournamentStandings.map(team => {
                     const teamData = team.team || team;
-                    const teamName = teamData.name || 'Team';
+                    const teamName = teamData.name || 'Команда';
                     const teamId = teamData.team_id;
                     const teamLogo = teamData.url_logo || '';
                     const isHomeTeam = teamId === homeTeamId;
@@ -794,11 +794,11 @@ async function loadMatchData() {
                     
                     return `
                         <tr onclick="goToTeam(${teamId})" style="cursor:pointer; ${isHomeTeam || isAwayTeam ? 'background: #e3f2fd; font-weight: bold;' : ''}">
-                            <td><strong>${team.position || team.pos || 'N/A'}</strong></td>
+                            <td><strong>${team.position || team.pos || 'Н/Д'}</strong></td>
                             <td style="display: flex; align-items: center; gap: 8px;">
                                 ${teamLogo ? `<img src="${teamLogo}" alt="${teamName}" style="height: 25px; width: 25px; object-fit: contain;">` : ''}
                                 ${teamName} ${isHomeTeam ? '🏠' : ''} ${isAwayTeam ? '✈️' : ''}
-                            </td>
+                             </td>
                             <td>${team.matches_played || team.played || 0}</td>
                             <td>${team.wins || 0}</td>
                             <td>${team.draws || 0}</td>
@@ -812,21 +812,21 @@ async function loadMatchData() {
             }
         }
 
-        // Team Stats таблица
+        // Таблица статистики команд
         const tbody = document.getElementById('team-stats-tbody');
         if (teamStats && (isFinished || isLive) && tbody) {
             const statsToShow = [
-                { name: 'Shots on Goal', home: teamStats.shots_on_goal_home_team ?? 0, away: teamStats.shots_on_goal_away_team ?? 0 },
-                { name: 'Total Shots', home: teamStats.total_shots_home_team ?? 0, away: teamStats.total_shots_away_team ?? 0 },
-                { name: 'Blocked Shots', home: teamStats.blocked_shots_home_team ?? 0, away: teamStats.blocked_shots_away_team ?? 0 },
-                { name: 'Fouls', home: teamStats.fouls_home_team ?? 0, away: teamStats.fouls_away_team ?? 0 },
-                { name: 'Corner Kicks', home: teamStats.corner_kicks_home_team ?? 0, away: teamStats.corner_kicks_away_team ?? 0 },
-                { name: 'Yellow Cards', home: teamStats.yellow_cards_home_team ?? 0, away: teamStats.yellow_cards_away_team ?? 0 },
-                { name: 'Red Cards', home: teamStats.red_cards_home_team ?? 0, away: teamStats.red_cards_away_team ?? 0 },
-                { name: 'Total Passes', home: teamStats.total_passes_home_team ?? 0, away: teamStats.total_passes_away_team ?? 0 },
-                { name: 'Complete Passes', home: teamStats.complete_passes_home_team ?? 0, away: teamStats.complete_passes_away_team ?? 0 },
-                { name: 'Offsides', home: teamStats.offsides_home_team ?? 0, away: teamStats.offsides_away_team ?? 0 },
-                { name: 'Shots Inside Box', home: teamStats.shots_inside_box_home_team ?? 0, away: teamStats.shots_inside_box_away_team ?? 0 }
+                { name: 'Удары в створ', home: teamStats.shots_on_goal_home_team ?? 0, away: teamStats.shots_on_goal_away_team ?? 0 },
+                { name: 'Всего ударов', home: teamStats.total_shots_home_team ?? 0, away: teamStats.total_shots_away_team ?? 0 },
+                { name: 'Блокированные удары', home: teamStats.blocked_shots_home_team ?? 0, away: teamStats.blocked_shots_away_team ?? 0 },
+                { name: 'Фолы', home: teamStats.fouls_home_team ?? 0, away: teamStats.fouls_away_team ?? 0 },
+                { name: 'Угловые', home: teamStats.corner_kicks_home_team ?? 0, away: teamStats.corner_kicks_away_team ?? 0 },
+                { name: 'Желтые карточки', home: teamStats.yellow_cards_home_team ?? 0, away: teamStats.yellow_cards_away_team ?? 0 },
+                { name: 'Красные карточки', home: teamStats.red_cards_home_team ?? 0, away: teamStats.red_cards_away_team ?? 0 },
+                { name: 'Всего пасов', home: teamStats.total_passes_home_team ?? 0, away: teamStats.total_passes_away_team ?? 0 },
+                { name: 'Точных пасов', home: teamStats.complete_passes_home_team ?? 0, away: teamStats.complete_passes_away_team ?? 0 },
+                { name: 'Положения вне игры', home: teamStats.offsides_home_team ?? 0, away: teamStats.offsides_away_team ?? 0 },
+                { name: 'Удары из штрафной', home: teamStats.shots_inside_box_home_team ?? 0, away: teamStats.shots_inside_box_away_team ?? 0 }
             ];
             tbody.innerHTML = statsToShow.map(stat => `
                 <tr>
@@ -837,7 +837,7 @@ async function loadMatchData() {
             `).join('');
         }
 
-        // Players Stats - сбор данных для сортировки
+        // Статистика игроков - сбор данных для сортировки
         if (playersStats && (isFinished || isLive)) {
             homePlayersData = [];
             awayPlayersData = [];
@@ -848,12 +848,12 @@ async function loadMatchData() {
                     const playerDetails = playerDetailsMap.get(playerId);
                     const name = playerDetails?.first_name && playerDetails?.last_name 
                         ? `${playerDetails.first_name} ${playerDetails.last_name}`
-                        : `${p.athlete?.first_name || ''} ${p.athlete?.last_name || ''}`.trim() || 'Unknown';
+                        : `${p.athlete?.first_name || ''} ${p.athlete?.last_name || ''}`.trim() || 'Неизвестно';
                     const photo = playerDetails?.url_photo || '';
                     const rating = p.rating ? p.rating.toFixed(1) : '0';
                     const position = playerDetails?.position || p.athlete?.position || '';
-                    const positionNames = { 'G': 'Goalkeeper', 'D': 'Defender', 'M': 'Midfielder', 'F': 'Forward' };
-                    const positionDisplay = positionNames[position] || position || 'N/A';
+                    const positionNames = { 'G': 'Вратарь', 'D': 'Защитник', 'M': 'Полузащитник', 'F': 'Нападающий' };
+                    const positionDisplay = positionNames[position] || position || 'Н/Д';
                     
                     return {
                         playerId, name, photo, position: positionDisplay,
@@ -879,12 +879,12 @@ async function loadMatchData() {
                     const playerDetails = playerDetailsMap.get(playerId);
                     const name = playerDetails?.first_name && playerDetails?.last_name 
                         ? `${playerDetails.first_name} ${playerDetails.last_name}`
-                        : `${p.athlete?.first_name || ''} ${p.athlete?.last_name || ''}`.trim() || 'Unknown';
+                        : `${p.athlete?.first_name || ''} ${p.athlete?.last_name || ''}`.trim() || 'Неизвестно';
                     const photo = playerDetails?.url_photo || '';
                     const rating = p.rating ? p.rating.toFixed(1) : '0';
                     const position = playerDetails?.position || p.athlete?.position || '';
-                    const positionNames = { 'G': 'Goalkeeper', 'D': 'Defender', 'M': 'Midfielder', 'F': 'Forward' };
-                    const positionDisplay = positionNames[position] || position || 'N/A';
+                    const positionNames = { 'G': 'Вратарь', 'D': 'Защитник', 'M': 'Полузащитник', 'F': 'Нападающий' };
+                    const positionDisplay = positionNames[position] || position || 'Н/Д';
                     
                     return {
                         playerId, name, photo, position: positionDisplay,
@@ -908,7 +908,7 @@ async function loadMatchData() {
             renderAwayPlayersTable();
         }
 
-        // Goalies Stats - сбор данных для сортировки
+        // Статистика вратарей - сбор данных для сортировки
         if (goaliesStats && (isFinished || isLive)) {
             homeGoaliesData = [];
             awayGoaliesData = [];
@@ -919,7 +919,7 @@ async function loadMatchData() {
                     const playerDetails = playerDetailsMap.get(playerId);
                     const name = playerDetails?.first_name && playerDetails?.last_name 
                         ? `${playerDetails.first_name} ${playerDetails.last_name}`
-                        : `${g.athlete?.first_name || ''} ${g.athlete?.last_name || ''}`.trim() || 'Unknown';
+                        : `${g.athlete?.first_name || ''} ${g.athlete?.last_name || ''}`.trim() || 'Неизвестно';
                     const photo = playerDetails?.url_photo || '';
                     const rating = g.rating ? g.rating.toFixed(1) : '0';
                     const passesAccuracy = g.pass_attempts > 0 ? ((g.complete_passes / g.pass_attempts) * 100).toFixed(1) : 0;
@@ -945,7 +945,7 @@ async function loadMatchData() {
                     const playerDetails = playerDetailsMap.get(playerId);
                     const name = playerDetails?.first_name && playerDetails?.last_name 
                         ? `${playerDetails.first_name} ${playerDetails.last_name}`
-                        : `${g.athlete?.first_name || ''} ${g.athlete?.last_name || ''}`.trim() || 'Unknown';
+                        : `${g.athlete?.first_name || ''} ${g.athlete?.last_name || ''}`.trim() || 'Неизвестно';
                     const photo = playerDetails?.url_photo || '';
                     const rating = g.rating ? g.rating.toFixed(1) : '0';
                     const passesAccuracy = g.pass_attempts > 0 ? ((g.complete_passes / g.pass_attempts) * 100).toFixed(1) : 0;
@@ -973,20 +973,20 @@ async function loadMatchData() {
             const homeGoaliesTbody = document.getElementById('home-goalies-tbody');
             const awayGoaliesTbody = document.getElementById('away-goalies-tbody');
             
-            if (homePlayersTbody) homePlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">⏳ Player statistics are being processed...<\/td><\/tr>';
-            if (awayPlayersTbody) awayPlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">⏳ Player statistics are being processed...<\/td><\/tr>';
-            if (homeGoaliesTbody) homeGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">⏳ Goalkeeper statistics are being processed...<\/td><\/tr>';
-            if (awayGoaliesTbody) awayGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">⏳ Goalkeeper statistics are being processed...<\/td><\/tr>';
+            if (homePlayersTbody) homePlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">⏳ Статистика игроков обрабатывается...</td></tr>';
+            if (awayPlayersTbody) awayPlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">⏳ Статистика игроков обрабатывается...</td></tr>';
+            if (homeGoaliesTbody) homeGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">⏳ Статистика вратарей обрабатывается...</td></tr>';
+            if (awayGoaliesTbody) awayGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">⏳ Статистика вратарей обрабатывается...</td></tr>';
         } else if (!isFinished && !isLive) {
             const homePlayersTbody = document.getElementById('home-players-tbody');
             const awayPlayersTbody = document.getElementById('away-players-tbody');
             const homeGoaliesTbody = document.getElementById('home-goalies-tbody');
             const awayGoaliesTbody = document.getElementById('away-goalies-tbody');
             
-            if (homePlayersTbody) homePlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">📊 Player stats will be available after the match<\/td><\/tr>';
-            if (awayPlayersTbody) awayPlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">📊 Player stats will be available after the match<\/td><\/tr>';
-            if (homeGoaliesTbody) homeGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">📊 Goalkeeper stats will be available after the match<\/td><\/tr>';
-            if (awayGoaliesTbody) awayGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">📊 Goalkeeper stats will be available after the match<\/td><\/tr>';
+            if (homePlayersTbody) homePlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">📊 Статистика игроков станет доступна после матча</td></tr>';
+            if (awayPlayersTbody) awayPlayersTbody.innerHTML = '<tr><td colspan="12" style="text-align: center;">📊 Статистика игроков станет доступна после матча</td></tr>';
+            if (homeGoaliesTbody) homeGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">📊 Статистика вратарей станет доступна после матча</td></tr>';
+            if (awayGoaliesTbody) awayGoaliesTbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">📊 Статистика вратарей станет доступна после матча</td></tr>';
         }
         
         // Обновляем иконки сортировки
@@ -996,9 +996,9 @@ async function loadMatchData() {
         updateAwayGoaliesSortIcons();
         
     } catch (error) {
-        console.error('Error loading match data:', error);
+        console.error('Ошибка загрузки данных матча:', error);
         const detailDiv = document.getElementById('match-detail');
-        if (detailDiv) detailDiv.innerHTML = '<p class="loading">Error loading match data. Please try again.</p>';
+        if (detailDiv) detailDiv.innerHTML = '<p class="loading">Ошибка загрузки данных матча. Пожалуйста, попробуйте снова.</p>';
     }
 }
 

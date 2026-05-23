@@ -1,11 +1,11 @@
-// Team page functionality
+// Функционал страницы команды
 let teamId;
 let currentTeamData = {};
 let currentStats = null;
 let availableSeasons = [];
 let currentPlayersSeason = null;
 
-// Пагинация для fixtures
+// Пагинация для матчей
 let fixturesCurrentPage = 0;
 let fixturesLimit = 10;
 let fixturesTotalCount = 0;
@@ -70,7 +70,7 @@ function generateSeasonsList() {
     return seasons;
 }
 
-// Функция загрузки fixtures с пагинацией
+// Функция загрузки матчей с пагинацией
 async function loadFixturesWithPagination(page = 1, append = false) {
     if (!teamId || isLoadingFixtures) return;
     
@@ -80,10 +80,10 @@ async function loadFixturesWithPagination(page = 1, append = false) {
     try {
         // Используем teamAPI.getFixtures с параметрами
         const fixtures = await teamAPI.getFixtures(teamId, fixturesLimit, offset);
-        console.log('Fixtures loaded:', fixtures);
+        console.log('Матчи загружены:', fixtures);
         
         if (!fixtures || !Array.isArray(fixtures)) {
-            throw new Error('Invalid fixtures data');
+            throw new Error('Некорректные данные матчей');
         }
         
         if (fixtures.length < fixturesLimit) {
@@ -95,10 +95,10 @@ async function loadFixturesWithPagination(page = 1, append = false) {
         renderFixturesList(fixtures, append);
         
     } catch (error) {
-        console.error('Error loading fixtures:', error);
+        console.error('Ошибка загрузки матчей:', error);
         const list = document.getElementById('fixtures-list');
         if (!append && list) {
-            list.innerHTML = '<p>No fixtures available</p>';
+            list.innerHTML = '<p>Матчи недоступны</p>';
         }
     } finally {
         isLoadingFixtures = false;
@@ -110,21 +110,21 @@ function renderFixturesList(fixtures, append = false) {
     if (!list) return;
     
     let html = '';
-    if (append && list.innerHTML !== '<p>No fixtures available</p>') {
+    if (append && list.innerHTML !== '<p>Матчи недоступны</p>') {
         html = list.innerHTML;
     }
     
     if (!fixtures || fixtures.length === 0) {
         if (!append) {
-            list.innerHTML = '<p>No fixtures available</p>';
+            list.innerHTML = '<p>Матчи недоступны</p>';
         }
         return;
     }
     
     html += fixtures.map(f => {
         const fixtureData = f.data || f;
-        const homeTeam = fixtureData.home_team?.name || fixtureData.home_team_name || 'Home';
-        const awayTeam = fixtureData.away_team?.name || fixtureData.away_team_name || 'Away';
+        const homeTeam = fixtureData.home_team?.name || fixtureData.home_team_name || 'Хозяева';
+        const awayTeam = fixtureData.away_team?.name || fixtureData.away_team_name || 'Гости';
         const homeLogo = fixtureData.home_team?.url_logo || '';
         const awayLogo = fixtureData.away_team?.url_logo || '';
         const homeScore = fixtureData.home_team_score ?? fixtureData.home_score ?? '-';
@@ -135,19 +135,22 @@ function renderFixturesList(fixtures, append = false) {
         const tournament = fixtureData.tournament?.name || '';
         
         let statusClass = '';
-        let statusText = status;
+        let statusText = '';
         if (status === 'Ended') {
             statusClass = 'status-ended';
-            statusText = '✓ Finished';
+            statusText = '✓ Завершен';
         } else if (status === 'Not started') {
             statusClass = 'status-scheduled';
-            statusText = '⏱ Scheduled';
+            statusText = '⏱ Запланирован';
+        } else if (status === 'In Progress' || status === 'Live') {
+            statusClass = 'status-live';
+            statusText = '🟢 В прямом эфире';
         }
         
         return `
             <div class="card match-card" style="cursor:pointer; margin-bottom: 1rem;" onclick="goToMatch(${matchId})">
                 <div class="match-header" style="display: flex; justify-content: space-between;">
-                    <span>${date.toLocaleDateString()}</span>
+                    <span>${date.toLocaleDateString('ru-RU')}</span>
                     <span>${tournament}</span>
                 </div>
                 <div class="match-score" style="display: flex; justify-content: space-between; align-items: center;">
@@ -172,7 +175,7 @@ function renderFixturesList(fixtures, append = false) {
     if (currentCount + fixturesLimit < fixturesTotalCount && !append) {
         html += `
             <div style="text-align: center; margin-top: 1rem;">
-                <button id="load-more-fixtures" class="btn-secondary" onclick="loadMoreFixtures()">Load More ↓</button>
+                <button id="load-more-fixtures" class="btn-secondary" onclick="loadMoreFixtures()">Показать ещё ↓</button>
             </div>
         `;
     }
@@ -204,17 +207,17 @@ async function loadTeamStatsWithFilters(season, dateFrom, dateTo) {
         url += `?${params.join('&')}`;
     }
     
-    console.log('Fetching team stats from:', url);
+    console.log('Загрузка статистики команды из:', url);
     try {
         const response = await fetch(url);
         if (response.ok) {
             return await response.json();
         } else {
-            console.error('Stats response not OK:', response.status);
+            console.error('Статистика: ответ не OK:', response.status);
             return null;
         }
     } catch (error) {
-        console.error('Error fetching stats:', error);
+        console.error('Ошибка загрузки статистики:', error);
         return null;
     }
 }
@@ -226,17 +229,17 @@ async function loadTeamPlayersStatsWithSeason(season) {
         url += `?season=${encodeURIComponent(season)}`;
     }
     
-    console.log('Fetching team players stats from:', url);
+    console.log('Загрузка статистики игроков команды из:', url);
     try {
         const response = await fetch(url);
         if (response.ok) {
             return await response.json();
         } else {
-            console.error('Players stats response not OK:', response.status);
+            console.error('Статистика игроков: ответ не OK:', response.status);
             return null;
         }
     } catch (error) {
-        console.error('Error fetching players stats:', error);
+        console.error('Ошибка загрузки статистики игроков:', error);
         return null;
     }
 }
@@ -244,7 +247,7 @@ async function loadTeamPlayersStatsWithSeason(season) {
 // Функция обновления статистики
 async function updateTeamStats() {
     const statsGrid = document.getElementById('team-stats-grid');
-    statsGrid.innerHTML = '<div class="loading-spinner">Loading statistics...</div>';
+    statsGrid.innerHTML = '<div class="loading-spinner">Загрузка статистики...</div>';
     
     const stats = await loadTeamStatsWithFilters(
         currentStatsFilters.season, 
@@ -255,10 +258,10 @@ async function updateTeamStats() {
     if (stats) {
         currentStats = stats;
         renderTeamStats(stats);
-        showFilterMessage('Statistics updated');
+        showFilterMessage('Статистика обновлена');
     } else {
-        statsGrid.innerHTML = '<p>No stats available for selected period</p>';
-        showFilterMessage('No data found for selected period', 'error');
+        statsGrid.innerHTML = '<p>Статистика за выбранный период недоступна</p>';
+        showFilterMessage('Данные за выбранный период не найдены', 'error');
     }
 }
 
@@ -269,7 +272,7 @@ async function updateTeamPlayersStats(season) {
         renderTeamPlayersStats(playersStats);
         setTimeout(addSortingHandlers, 100);
     } else {
-        document.getElementById('players-tbody').innerHTML = '<tr><td colspan="8">No players stats available</td>';
+        document.getElementById('players-tbody').innerHTML = '<tr><td colspan="8">Статистика игроков недоступна</td><\/tr>';
     }
 }
 
@@ -279,11 +282,32 @@ function renderTeamStats(stats) {
     const statsData = stats.data || stats;
     const statsToShow = Object.entries(statsData).slice(0, 12);
     
+    const labelMap = {
+        total_matches: 'Матчи',
+        goals: 'Голы',
+        goals_conceded: 'Пропущено',
+        wins: 'Победы',
+        draws: 'Ничьи',
+        losses: 'Поражения',
+        win_percentage: 'Побед %',
+        avg_goals_per_match: 'Голов за матч',
+        avg_possession: 'Владение %'
+    };
+    
+    function formatLabel(key) {
+        return labelMap[key] || key.replace(/_/g, ' ')
+              .split(' ')
+              .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(' ');
+    }
+    
     if (statsToShow.length > 0) {
         statsGrid.innerHTML = statsToShow.map(([key, value]) => {
             let displayValue = value;
             if (typeof value === 'number') {
-                if (Number.isInteger(value)) {
+                if (key.includes('percentage') || key.includes('accuracy')) {
+                    displayValue = (value * 100).toFixed(1) + '%';
+                } else if (Number.isInteger(value)) {
                     displayValue = value;
                 } else {
                     displayValue = value.toFixed(2);
@@ -291,13 +315,13 @@ function renderTeamStats(stats) {
             }
             return `
                 <div class="stat-box">
-                    <div class="stat-value">${displayValue ?? 'N/A'}</div>
+                    <div class="stat-value">${displayValue ?? 'Н/Д'}</div>
                     <div class="stat-label">${formatLabel(key)}</div>
                 </div>
             `;
         }).join('');
     } else {
-        statsGrid.innerHTML = '<p>No stats available</p>';
+        statsGrid.innerHTML = '<p>Статистика недоступна</p>';
     }
 }
 
@@ -316,7 +340,7 @@ function renderTeamPlayersStats(playersStats, sortColumn = null, sortDirection =
     if (!tbody) return;
     
     if (!playersStats) {
-        tbody.innerHTML = '<tr><td colspan="8">No players stats available</td>';
+        tbody.innerHTML = '<tr><td colspan="8">Статистика игроков недоступна</td><\/tr>';
         return;
     }
     
@@ -335,7 +359,7 @@ function renderTeamPlayersStats(playersStats, sortColumn = null, sortDirection =
     
     const allPlayers = [];
     const positions = ['G', 'D', 'M', 'F'];
-    const positionNames = { 'G': 'Goalkeeper', 'D': 'Defender', 'M': 'Midfielder', 'F': 'Forward' };
+    const positionNames = { 'G': 'Вратарь', 'D': 'Защитник', 'M': 'Полузащитник', 'F': 'Нападающий' };
     
     positions.forEach(pos => {
         if (playersStats[pos] && Array.isArray(playersStats[pos])) {
@@ -354,7 +378,7 @@ function renderTeamPlayersStats(playersStats, sortColumn = null, sortDirection =
                     avg_rating: player.avg_rating || 0,
                     minutes_played: minutes,
                     goals_per_90: goalsPer90,
-                    full_name: `${player.first_name || ''} ${player.last_name || ''}`.trim() || 'Unknown'
+                    full_name: `${player.first_name || ''} ${player.last_name || ''}`.trim() || 'Неизвестно'
                 });
             });
         }
@@ -446,19 +470,19 @@ function renderTeamPlayersStats(playersStats, sortColumn = null, sortDirection =
                             <strong>${name}</strong>
                             ${nation ? `<div style="font-size: 0.7rem; color: #666;">${flag ? `<img src="${flag}" style="width: 16px; vertical-align: middle;">` : ''} ${nation}</div>` : ''}
                         </div>
-                       </td>
-                      <td>${position}</td>
-                      <td>${matches}</td>
-                      <td>${goals}</td>
-                      <td>${assists}</td>
-                      <td>${rating}</td>
-                      <td>${goalsPer90}</td>
-                      <td>${minutes}</td>
+                        </td>
+                       <td>${position}</td>
+                       <td>${matches}</td>
+                       <td>${goals}</td>
+                       <td>${assists}</td>
+                       <td>${rating}</td>
+                       <td>${goalsPer90}</td>
+                       <td>${minutes}</td>
                     </tr>
             `;
         }).join('');
     } else {
-        tbody.innerHTML = '<table><td colspan="8">No players stats available</td>';
+        tbody.innerHTML = '<tr><td colspan="8">Статистика игроков недоступна</td><\/tr>';
     }
 }
 
@@ -502,7 +526,7 @@ async function applyStatsFilters() {
     const dateTo = document.getElementById('date-to').value;
     
     if (!seasonFilter && !dateFrom && !dateTo) {
-        alert('Please select either a season or date range');
+        alert('Пожалуйста, выберите сезон или диапазон дат');
         return;
     }
     
@@ -537,7 +561,7 @@ async function applyTableSeasonFilter() {
     const standings = await loadStandingsWithSeason(season);
     if (standings && Array.isArray(standings)) {
         renderStandings(standings);
-        showFilterMessage(`Standings for season ${season || 'current'}`, 'success');
+        showFilterMessage(`Таблица за сезон ${season || 'текущий'}`, 'success');
     }
 }
 
@@ -553,7 +577,7 @@ async function loadStandingsWithSeason(season) {
             return await response.json();
         }
     } catch (error) {
-        console.error('Error loading standings:', error);
+        console.error('Ошибка загрузки таблицы:', error);
     }
     return null;
 }
@@ -564,22 +588,22 @@ function renderStandings(standings) {
     
     tbody.innerHTML = standings.map(standing => {
         const teamData = standing.team || standing;
-        const teamName = teamData.name || teamData.team_name || 'Team';
+        const teamName = teamData.name || teamData.team_name || 'Команда';
         const teamIdStanding = teamData.team_id || teamData.id;
         const teamLogo = teamData.url_logo || '';
         const isCurrentTeam = teamIdStanding == teamId;
         
         return `
             <tr onclick="goToTeam(${teamIdStanding})" style="cursor:pointer; ${isCurrentTeam ? 'background: linear-gradient(90deg, #e3f2fd, #bbdef5); font-weight: bold; border-left: 4px solid #3498db;' : ''}">
-                <td><strong>${standing.position || standing.pos || 'N/A'}</strong></td>
+                <td><strong>${standing.position || standing.pos || 'Н/Д'}</strong></td>
                 <td style="display: flex; align-items: center; gap: 10px;">
                     ${teamLogo ? `<img src="${teamLogo}" alt="${teamName}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
                     ${teamName} ${isCurrentTeam ? '🏠' : ''}
-                   </td>
+                    </td>
                 <td>${standing.points || 0}</td>
                 <td>${standing.matches_played || standing.played || 0}</td>
                 <td>${standing.wins || 0}/${standing.draws || 0}/${standing.losses || 0}</td>
-                </tr>
+            </tr>
         `;
     }).join('');
 }
@@ -589,7 +613,7 @@ function populateSeasonSelectors() {
     
     const seasonFilter = document.getElementById('season-filter');
     if (seasonFilter) {
-        seasonFilter.innerHTML = '<option value="">Select Season</option>';
+        seasonFilter.innerHTML = '<option value="">Выберите сезон</option>';
         seasons.forEach(season => {
             const option = document.createElement('option');
             option.value = season;
@@ -600,7 +624,7 @@ function populateSeasonSelectors() {
     
     const tableSeasonFilter = document.getElementById('table-season-filter');
     if (tableSeasonFilter) {
-        tableSeasonFilter.innerHTML = '<option value="">Current Season</option>';
+        tableSeasonFilter.innerHTML = '<option value="">Текущий сезон</option>';
         seasons.forEach(season => {
             const option = document.createElement('option');
             option.value = season;
@@ -640,35 +664,35 @@ function showFilterMessage(message, type = 'success') {
 
 async function loadTeamData() {
     try {
-        console.log('Loading team data for ID:', teamId);
+        console.log('Загрузка данных команды для ID:', teamId);
         
         const details = await teamAPI.getDetails(teamId).catch(e => {
-            console.error('Details error:', e);
+            console.error('Ошибка деталей:', e);
             return null;
         });
         
         const stats = await teamAPI.getStats(teamId).catch(e => {
-            console.error('Stats error:', e);
+            console.error('Ошибка статистики:', e);
             return null;
         });
         
         const nextGame = await teamAPI.getNextGame(teamId).catch(e => {
-            console.error('Next game error:', e);
+            console.error('Ошибка следующего матча:', e);
             return null;
         });
         
         const standings = await teamAPI.getStandings(teamId).catch(e => {
-            console.error('Standings error:', e);
+            console.error('Ошибка таблицы:', e);
             return null;
         });
         
         const manager = await teamAPI.getManager(teamId).catch(e => {
-            console.error('Manager error:', e);
+            console.error('Ошибка тренера:', e);
             return null;
         });
         
         const fixtures = await teamAPI.getFixtures(teamId).catch(e => {
-            console.error('Fixtures error:', e);
+            console.error('Ошибка матчей:', e);
             return null;
         });
         
@@ -698,27 +722,27 @@ async function loadTeamData() {
                     teamForm = await formResponse.json();
                 }
             } catch (e) {
-                console.error('Error loading team form:', e);
+                console.error('Ошибка загрузки формы команды:', e);
             }
         }
 
-        console.log('Team details:', details);
-        console.log('Team stats:', stats);
-        console.log('Next game:', nextGame);
-        console.log('Standings:', standings);
-        console.log('Manager:', manager);
-        console.log('Fixtures:', fixtures);
-        console.log('Team form:', teamForm);
+        console.log('Детали команды:', details);
+        console.log('Статистика команды:', stats);
+        console.log('Следующий матч:', nextGame);
+        console.log('Таблица:', standings);
+        console.log('Тренер:', manager);
+        console.log('Матчи:', fixtures);
+        console.log('Форма команды:', teamForm);
 
         if (!details) {
-            document.getElementById('team-detail').innerHTML = '<p class="loading">Team not found</p>';
+            document.getElementById('team-detail').innerHTML = '<p class="loading">Команда не найдена</p>';
             return;
         }
 
         currentTeamData = details;
 
-        // Update header with logo
-        const teamName = details.name || details.team_name || 'Team';
+        // Обновляем заголовок с логотипом
+        const teamName = details.name || details.team_name || 'Команда';
         document.getElementById('team-name').innerHTML = `
             ${details.url_logo ? `<img src="${details.url_logo}" alt="${teamName}" style="height: 40px; vertical-align: middle; margin-right: 10px;">` : ''}
             ${teamName}
@@ -745,59 +769,59 @@ async function loadTeamData() {
             const trend = teamForm.trend || 0;
             
             let trendIcon = '➡️';
-            let trendText = 'Stable';
+            let trendText = 'Стабильна';
             let trendColor = '#3498db';
             if (trend > 0.05) {
                 trendIcon = '📈';
-                trendText = 'Improving';
+                trendText = 'Улучшается';
                 trendColor = '#2ecc71';
             } else if (trend < -0.05) {
                 trendIcon = '📉';
-                trendText = 'Declining';
+                trendText = 'Ухудшается';
                 trendColor = '#e74c3c';
             }
             
             let formRating = '';
             let formColor = '';
             if (formIndex >= 70) {
-                formRating = 'Excellent 🔥';
+                formRating = 'Отлично 🔥';
                 formColor = '#2ecc71';
             } else if (formIndex >= 55) {
-                formRating = 'Good 👍';
+                formRating = 'Хорошо 👍';
                 formColor = '#3498db';
             } else if (formIndex >= 40) {
-                formRating = 'Average 📊';
+                formRating = 'Средне 📊';
                 formColor = '#f39c12';
             } else {
-                formRating = 'Poor 👎';
+                formRating = 'Плохо 👎';
                 formColor = '#e74c3c';
             }
             
             const formHtml = `
                 <div id="team-form-analytics" class="form-analytics-section" style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #1e3799 0%, #2c3e50 100%); border-radius: 12px; color: white;">
-                    <h3 style="text-align: center; margin-bottom: 1rem;">📊 Team Form Analytics (${season})</h3>
+                    <h3 style="text-align: center; margin-bottom: 1rem;">📊 Аналитика формы команды (${season})</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                         <div class="form-card" style="text-align: center; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
                             <div class="form-value" style="font-size: 2rem; font-weight: bold; color: ${formColor};">${formIndex}%</div>
-                            <div class="form-label">Form Index</div>
+                            <div class="form-label">Индекс формы</div>
                             <div class="form-rating" style="font-size: 0.8rem; margin-top: 0.5rem;">${formRating}</div>
                         </div>
                         <div class="form-card" style="text-align: center; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
                             <div class="form-value" style="font-size: 2rem; font-weight: bold;">${attackIndex}%</div>
-                            <div class="form-label">⚽ Attack Index</div>
+                            <div class="form-label">⚽ Индекс атаки</div>
                         </div>
                         <div class="form-card" style="text-align: center; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
                             <div class="form-value" style="font-size: 2rem; font-weight: bold;">${defenseIndex}%</div>
-                            <div class="form-label">🛡️ Defense Index</div>
+                            <div class="form-label">🛡️ Индекс защиты</div>
                         </div>
                         <div class="form-card" style="text-align: center; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1rem;">
                             <div class="form-value" style="font-size: 2rem; font-weight: bold; color: ${trendColor};">${trendIcon} ${trend > 0 ? '+' : ''}${(trend * 100).toFixed(1)}%</div>
-                            <div class="form-label">Trend</div>
+                            <div class="form-label">Тренд</div>
                             <div class="form-trend" style="font-size: 0.8rem;">${trendText}</div>
                         </div>
                     </div>
                     <div style="margin-top: 1rem; font-size: 0.8rem; text-align: center; opacity: 0.8;">
-                        📊 Based on last ${teamForm.matches_used || 0} matches | Confidence: ${confidence}%
+                        📊 На основе ${teamForm.matches_used || 0} последних матчей | Достоверность: ${confidence}%
                     </div>
                     ${teamForm.details ? `<div style="margin-top: 0.5rem; font-size: 0.7rem; text-align: center; opacity: 0.6;">${teamForm.details}</div>` : ''}
                 </div>
@@ -809,12 +833,12 @@ async function loadTeamData() {
             }
         }
 
-        // Next game with team logos and tournament info
+        // Следующий матч с логотипами команд и информацией о турнире
         if (nextGame && Object.keys(nextGame).length > 0) {
             const game = Array.isArray(nextGame) ? nextGame[0] : nextGame;
             const gameData = game.data || game;
-            const homeTeam = gameData.home_team?.name || 'Home';
-            const awayTeam = gameData.away_team?.name || 'Away';
+            const homeTeam = gameData.home_team?.name || 'Хозяева';
+            const awayTeam = gameData.away_team?.name || 'Гости';
             const homeLogo = gameData.home_team?.url_logo || '';
             const awayLogo = gameData.away_team?.url_logo || '';
             const tournamentName = gameData.tournament?.name || '';
@@ -826,40 +850,40 @@ async function loadTeamData() {
                 <div class="match-card" style="cursor:pointer;" onclick="goToMatch(${matchId})">
                     <div class="match-header">
                         ${tournamentLogo ? `<img src="${tournamentLogo}" alt="${tournamentName}" style="height: 20px; vertical-align: middle; margin-right: 5px;">` : '🏆'}
-                        ${tournamentName} • Round ${gameData.round || '?'}
+                        ${tournamentName} • Тур ${gameData.round || '?'}
                     </div>
-                    <div class="match-header">${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+                    <div class="match-header">${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}</div>
                     <div class="match-score">
                         <div class="team-container">
                             ${homeLogo ? `<img src="${homeLogo}" alt="${homeTeam}" style="height: 50px; width: 50px; object-fit: contain;">` : '<div style="width: 50px;"></div>'}
                             <span class="team-name">${homeTeam}</span>
                         </div>
-                        <span class="score">VS</span>
+                        <span class="score">ПРОТИВ</span>
                         <div class="team-container">
                             ${awayLogo ? `<img src="${awayLogo}" alt="${awayTeam}" style="height: 50px; width: 50px; object-fit: contain;">` : '<div style="width: 50px;"></div>'}
                             <span class="team-name">${awayTeam}</span>
                         </div>
                     </div>
-                    <div class="match-status">${gameData.status || 'Upcoming'}</div>
+                    <div class="match-status">${gameData.status || 'Предстоящий'}</div>
                 </div>
             `;
         } else {
-            document.getElementById('next-game').innerHTML = '<p>No upcoming games</p>';
+            document.getElementById('next-game').innerHTML = '<p>Нет предстоящих матчей</p>';
         }
 
-        // Standings with current team highlighted
+        // Турнирная таблица с подсветкой текущей команды
         if (standings && Array.isArray(standings)) {
             renderStandings(standings);
         } else {
-            document.getElementById('standing-tbody').innerHTML = '<tr><td colspan="5">No standings available</tr>';
+            document.getElementById('standing-tbody').innerHTML = '<tr><td colspan="5">Таблица недоступна</td><\/tr>';
         }
 
-        // Manager
+        // Тренер
         if (manager) {
             const managerData = manager;
             const firstName = managerData.first_name || '';
             const lastName = managerData.last_name || '';
-            const name = `${firstName} ${lastName}`.trim() || 'Manager';
+            const name = `${firstName} ${lastName}`.trim() || 'Тренер';
             const managerId = managerData.manager_id;
             const nation = managerData.nation?.name || '';
             const flag = managerData.nation?.url_flag || '';
@@ -872,25 +896,25 @@ async function loadTeamData() {
                                   `<div style="width: 80px; height: 80px; background: #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">👨‍✈️</div>`}
                         <div>
                             <h3 style="margin: 0;">${name}</h3>
-                            <p>Manager</p>
+                            <p>Тренер</p>
                             ${nation ? `<p class="result-info">${flag ? `<img src="${flag}" style="width: 20px; vertical-align: middle;">` : '🌍'} ${nation}</p>` : ''}
                         </div>
                     </div>
                 </div>
             `;
         } else {
-            document.getElementById('manager-card').innerHTML = '<p>No manager information available</p>';
+            document.getElementById('manager-card').innerHTML = '<p>Информация о тренере недоступна</p>';
         }
 
-        // Fixtures с пагинацией
+        // Матчи с пагинацией
         fixturesCurrentPage = 0;
         await loadFixturesWithPagination(1, false);
         
-        // Tournament info
+        // Информация о турнире
         if (details.tournament) {
             const tournamentInfo = document.getElementById('team-info');
             if (tournamentInfo) {
-                tournamentInfo.innerHTML = `${details.tournament.name || 'Tournament'} ${details.tournament.season || ''}`;
+                tournamentInfo.innerHTML = `${details.tournament.name || 'Турнир'} ${details.tournament.season || ''}`;
             }
         }
         
@@ -902,17 +926,17 @@ async function loadTeamData() {
                     const isFavorite = favorites.some(f => f.team_id === parseInt(teamId));
                     const btn = document.getElementById('fav-btn');
                     if (btn) {
-                        btn.textContent = isFavorite ? '★ Remove from Favorites' : '★ Add to Favorites';
+                        btn.textContent = isFavorite ? '★ Удалить из избранного' : '★ Добавить в избранное';
                     }
                 }
             } catch (e) {
-                console.error('Error checking favorites:', e);
+                console.error('Ошибка проверки избранного:', e);
             }
         }
         
     } catch (error) {
-        console.error('Error loading team data:', error);
-        document.getElementById('team-detail').innerHTML = '<p class="loading">Error loading team data. Please try again.</p>';
+        console.error('Ошибка загрузки данных команды:', error);
+        document.getElementById('team-detail').innerHTML = '<p class="loading">Ошибка загрузки данных команды. Пожалуйста, попробуйте снова.</p>';
     }
 }
 
@@ -925,11 +949,11 @@ function addPlayersSeasonSelector() {
     
     const seasonSelectorHtml = `
         <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; gap: 0.5rem;">
-            <label>Season:</label>
+            <label>Сезон:</label>
             <select id="players-season-filter" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
-                <option value="">Current Season</option>
+                <option value="">Текущий сезон</option>
             </select>
-            <button id="apply-players-season" class="btn-primary" style="padding: 0.5rem 1rem;">Apply</button>
+            <button id="apply-players-season" class="btn-primary" style="padding: 0.5rem 1rem;">Применить</button>
         </div>
     `;
     
@@ -949,7 +973,7 @@ function addPlayersSeasonSelector() {
         document.getElementById('apply-players-season').addEventListener('click', async () => {
             const season = document.getElementById('players-season-filter').value;
             await updateTeamPlayersStats(season || null);
-            showFilterMessage(`Players stats for season ${season || 'current'}`, 'success');
+            showFilterMessage(`Статистика игроков за сезон ${season || 'текущий'}`, 'success');
         });
     }
 }
@@ -985,23 +1009,16 @@ async function toggleFavorite() {
 
     try {
         const btn = document.getElementById('fav-btn');
-        if (btn.textContent.includes('Remove')) {
+        if (btn.textContent.includes('Удалить')) {
             await teamAPI.removeFavorite(teamId);
-            btn.textContent = '★ Add to Favorites';
+            btn.textContent = '★ Добавить в избранное';
         } else {
             await teamAPI.addFavorite(teamId);
-            btn.textContent = '★ Remove from Favorites';
+            btn.textContent = '★ Удалить из избранного';
         }
     } catch (error) {
-        console.error('Error toggling favorite:', error);
+        console.error('Ошибка переключения избранного:', error);
     }
-}
-
-function formatLabel(key) {
-    return key.replace(/_/g, ' ')
-              .split(' ')
-              .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-              .join(' ');
 }
 
 function goToMatch(id) {

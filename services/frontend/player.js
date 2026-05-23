@@ -1,4 +1,4 @@
-// Player page functionality
+// Функционал страницы игрока
 let playerId;
 let isFavorite = false;
 let currentStats = null;
@@ -11,7 +11,7 @@ let currentSimilarParams = {
     season: null
 };
 
-// Пагинация для fixtures
+// Пагинация для матчей
 let fixturesCurrentPage = 0;
 let fixturesLimit = 10;
 let fixturesTotalCount = 0;
@@ -77,7 +77,7 @@ function populateSimilarSeasons() {
     if (!seasonSelect) return;
     
     // Очищаем существующие опции
-    seasonSelect.innerHTML = '<option value="">Auto-detect</option>';
+    seasonSelect.innerHTML = '<option value="">Автоопределение</option>';
     
     // Добавляем сезоны от 2015/2016 до 2025/2026
     for (let year = 2025; year >= 2015; year--) {
@@ -89,7 +89,7 @@ function populateSimilarSeasons() {
     }
 }
 
-// Функция загрузки fixtures с пагинацией
+// Функция загрузки матчей с пагинацией
 async function loadFixturesWithPagination(page = 1, append = false) {
     if (!playerId || isLoadingFixtures) return;
     
@@ -98,15 +98,15 @@ async function loadFixturesWithPagination(page = 1, append = false) {
     
     try {
         const url = `/api/player/${playerId}/fixtures?limit=${fixturesLimit}&offset=${offset}`;
-        console.log('Loading fixtures from:', url);
+        console.log('Загрузка матчей из:', url);
         
         const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`Failed to load fixtures: ${response.status}`);
+            throw new Error(`Не удалось загрузить матчи: ${response.status}`);
         }
         
         const fixtures = await response.json();
-        console.log('Fixtures loaded:', fixtures);
+        console.log('Матчи загружены:', fixtures);
         
         // Обновляем общее количество (если API возвращает total, иначе используем длину массива)
         if (fixtures.length < fixturesLimit) {
@@ -118,24 +118,24 @@ async function loadFixturesWithPagination(page = 1, append = false) {
         renderFixturesList(fixtures, append);
         
     } catch (error) {
-        console.error('Error loading fixtures:', error);
+        console.error('Ошибка загрузки матчей:', error);
         const list = document.getElementById('fixtures-list');
         if (!append && list) {
-            list.innerHTML = '<p>No fixtures available</p>';
+            list.innerHTML = '<p>Матчи не найдены</p>';
         }
     } finally {
         isLoadingFixtures = false;
     }
 }
 
-// Функция отрисовки списка fixtures
+// Функция отрисовки списка матчей
 function renderFixturesList(fixtures, append = false) {
     const list = document.getElementById('fixtures-list');
     if (!list) return;
     
     let html = '';
     
-    if (append && list.innerHTML !== '<p>No fixtures available</p>') {
+    if (append && list.innerHTML !== '<p>Матчи не найдены</p>') {
         html = list.innerHTML;
     } else {
         html = '';
@@ -143,14 +143,14 @@ function renderFixturesList(fixtures, append = false) {
     
     if (!fixtures || fixtures.length === 0) {
         if (!append) {
-            list.innerHTML = '<p>No fixtures available</p>';
+            list.innerHTML = '<p>Матчи не найдены</p>';
         }
         return;
     }
     
     html += fixtures.map(f => {
-        const homeTeam = f.home_team?.name || 'Home';
-        const awayTeam = f.away_team?.name || 'Away';
+        const homeTeam = f.home_team?.name || 'Хозяева';
+        const awayTeam = f.away_team?.name || 'Гости';
         const homeLogo = f.home_team?.url_logo || '';
         const awayLogo = f.away_team?.url_logo || '';
         const homeScore = f.home_team_score ?? '-';
@@ -165,19 +165,22 @@ function renderFixturesList(fixtures, append = false) {
         const tournament = f.tournament?.name || '';
         
         let statusClass = '';
-        let statusText = status;
+        let statusText = '';
         if (status === 'Ended') {
             statusClass = 'status-ended';
-            statusText = '✓ Finished';
+            statusText = '✓ Завершен';
         } else if (status === 'Not started') {
             statusClass = 'status-scheduled';
-            statusText = '⏱ Scheduled';
+            statusText = '⏱ Запланирован';
+        } else if (status === 'In Progress' || status === 'Live') {
+            statusClass = 'status-live';
+            statusText = '🟢 В прямом эфире';
         }
         
         return `
             <div class="card match-card" style="cursor:pointer; margin-bottom: 1rem;" onclick="goToMatch(${matchId})">
                 <div class="match-header" style="display: flex; justify-content: space-between;">
-                    <span>${date.toLocaleDateString()}</span>
+                    <span>${date.toLocaleDateString('ru-RU')}</span>
                     <span>${tournament}</span>
                 </div>
                 <div class="match-score" style="display: flex; justify-content: space-between; align-items: center;">
@@ -193,18 +196,18 @@ function renderFixturesList(fixtures, append = false) {
                 </div>
                 <div class="match-status ${statusClass}" style="display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
                     <span>${statusText}</span>
-                    <span>⚽ ${goals} goals | 🎯 ${assists} assists | ⭐ ${rating} | ⏱️ ${minutes}'</span>
+                    <span>⚽ ${goals} голов | 🎯 ${assists} передач | ⭐ ${rating} | ⏱️ ${minutes} мин.</span>
                 </div>
             </div>
         `;
     }).join('');
     
-    // Добавляем кнопку "Load More" если есть еще данные
+    // Добавляем кнопку "Показать ещё" если есть еще данные
     const currentCount = (fixturesCurrentPage + 1) * fixturesLimit;
     if (currentCount < fixturesTotalCount && !append) {
         html += `
             <div style="text-align: center; margin-top: 1rem;">
-                <button id="load-more-fixtures" class="btn-secondary" onclick="loadMoreFixtures()">Load More ↓</button>
+                <button id="load-more-fixtures" class="btn-secondary" onclick="loadMoreFixtures()">Показать ещё ↓</button>
             </div>
         `;
     }
@@ -237,7 +240,7 @@ async function loadSimilarPlayers(showLoading = true) {
     
     currentSimilarParams = { top_k: topK, min_minutes: minMinutes, season };
     
-    console.log('Loading similar players with params:', currentSimilarParams);
+    console.log('Загрузка похожих игроков с параметрами:', currentSimilarParams);
     
     // Показываем индикатор загрузки
     const statsGrid = document.getElementById('player-stats-grid');
@@ -245,9 +248,9 @@ async function loadSimilarPlayers(showLoading = true) {
     
     if (showLoading) {
         if (existingBlock) {
-            existingBlock.innerHTML = '<div style="text-align: center; padding: 2rem;">🔄 Loading similar players...</div>';
+            existingBlock.innerHTML = '<div style="text-align: center; padding: 2rem;">🔄 Загрузка похожих игроков...</div>';
         } else if (statsGrid) {
-            statsGrid.insertAdjacentHTML('afterend', '<div id="temp-similar-loading" style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); border-radius: 12px; color: white; text-align: center;">🔄 Loading similar players...</div>');
+            statsGrid.insertAdjacentHTML('afterend', '<div id="temp-similar-loading" style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); border-radius: 12px; color: white; text-align: center;">🔄 Загрузка похожих игроков...</div>');
         }
     }
     
@@ -263,27 +266,27 @@ async function loadSimilarPlayers(showLoading = true) {
         const response = await fetch(url, { headers });
         
         if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
+            throw new Error(`Ошибка API: ${response.status}`);
         }
         
         const similarPlayers = await response.json();
-        console.log('Similar players received:', similarPlayers);
+        console.log('Похожие игроки получены:', similarPlayers);
         
         // Обновляем блок похожих игроков
         await updateSimilarPlayersBlock(similarPlayers, season);
         
     } catch (error) {
-        console.error('Error loading similar players:', error);
-        showFilterMessage('Failed to load similar players: ' + error.message, 'error');
+        console.error('Ошибка загрузки похожих игроков:', error);
+        showFilterMessage('Не удалось загрузить похожих игроков: ' + error.message, 'error');
         
         // Показываем ошибку в блоке
         const existingBlock = document.getElementById('player-similarity');
         if (existingBlock) {
             existingBlock.innerHTML = `
                 <div style="text-align: center; padding: 2rem;">
-                    <p>❌ Failed to load similar players</p>
+                    <p>❌ Не удалось загрузить похожих игроков</p>
                     <p style="font-size: 0.8rem; opacity: 0.7;">${error.message}</p>
-                    <button onclick="loadSimilarPlayers(true)" class="btn-primary" style="margin-top: 1rem;">🔄 Try Again</button>
+                    <button onclick="loadSimilarPlayers(true)" class="btn-primary" style="margin-top: 1rem;">🔄 Попробовать снова</button>
                 </div>
             `;
         }
@@ -301,8 +304,8 @@ async function updateSimilarPlayersBlock(similarPlayers, season) {
         if (existingBlock) {
             existingBlock.innerHTML = `
                 <div style="text-align: center; padding: 2rem;">
-                    <p>🔍 No similar players found</p>
-                    <p style="font-size: 0.8rem; opacity: 0.7;">Try adjusting search parameters</p>
+                    <p>🔍 Похожие игроки не найдены</p>
+                    <p style="font-size: 0.8rem; opacity: 0.7;">Попробуйте изменить параметры поиска</p>
                 </div>
             `;
         }
@@ -313,7 +316,7 @@ async function updateSimilarPlayersBlock(similarPlayers, season) {
     const similarPlayersDetails = [];
     for (const similar of similarPlayers.players.slice(0, currentSimilarParams.top_k)) {
         const similarDetail = await playerAPI.getDetails(similar.player_id).catch(e => {
-            console.error(`Error loading similar player ${similar.player_id}:`, e);
+            console.error(`Ошибка загрузки похожего игрока ${similar.player_id}:`, e);
             return null;
         });
         if (similarDetail) {
@@ -321,22 +324,24 @@ async function updateSimilarPlayersBlock(similarPlayers, season) {
         }
     }
     
+    const positionNames = { 'G': 'Вратарь', 'D': 'Защитник', 'M': 'Полузащитник', 'F': 'Нападающий' };
+    const positionDisplay = positionNames[similarPlayers.position] || similarPlayers.position || 'Н/Д';
+    
     const similarityHtml = `
         <div id="player-similarity" class="similar-players-section" style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); border-radius: 12px; color: white;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
-                <h3 style="margin: 0;">🔄 Similar Players (${similarPlayers.position || 'N/A'})</h3>
+                <h3 style="margin: 0;">🔄 Похожие игроки (${positionDisplay})</h3>
                 <div style="font-size: 0.7rem; opacity: 0.7;">
-                    ⚙️ Top ${currentSimilarParams.top_k} | Min ${currentSimilarParams.min_minutes} min | Season ${season}
+                    ⚙️ Топ ${currentSimilarParams.top_k} | Мин ${currentSimilarParams.min_minutes} мин | Сезон ${season}
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
                 ${similarPlayersDetails.map((player, index) => {
                     const similarityPercent = (player.similarity * 100).toFixed(1);
-                    const playerName = `${player.details.first_name || ''} ${player.details.last_name || ''}`.trim() || 'Unknown';
+                    const playerName = `${player.details.first_name || ''} ${player.details.last_name || ''}`.trim() || 'Неизвестно';
                     const playerPhoto = player.details.url_photo || '';
-                    const playerPosition = player.details.position || 'N/A';
-                    const positionNames = { 'G': 'Goalkeeper', 'D': 'Defender', 'M': 'Midfielder', 'F': 'Forward' };
-                    const positionDisplay = positionNames[playerPosition] || playerPosition;
+                    const playerPosition = player.details.position || 'Н/Д';
+                    const positionDisplayPlayer = positionNames[playerPosition] || playerPosition;
                     
                     let similarityColor = '#e74c3c';
                     if (similarityPercent >= 70) similarityColor = '#2ecc71';
@@ -351,12 +356,12 @@ async function updateSimilarPlayersBlock(similarPlayers, season) {
                                 }
                                 <div style="flex: 1;">
                                     <div style="font-weight: bold; font-size: 1.1rem;">${playerName}</div>
-                                    <div style="font-size: 0.8rem; opacity: 0.9;">${positionDisplay}</div>
+                                    <div style="font-size: 0.8rem; opacity: 0.9;">${positionDisplayPlayer}</div>
                                     <div style="margin-top: 5px;">
                                         <div style="background: rgba(255,255,255,0.2); border-radius: 10px; height: 6px; width: 100%;">
                                             <div style="background: ${similarityColor}; width: ${similarityPercent}%; height: 6px; border-radius: 10px;"></div>
                                         </div>
-                                        <div style="font-size: 0.8rem; margin-top: 3px;">Match: ${similarityPercent}%</div>
+                                        <div style="font-size: 0.8rem; margin-top: 3px;">Совпадение: ${similarityPercent}%</div>
                                     </div>
                                 </div>
                                 <div style="font-size: 1.2rem;">#${index + 1}</div>
@@ -366,7 +371,7 @@ async function updateSimilarPlayersBlock(similarPlayers, season) {
                 }).join('')}
             </div>
             <div style="margin-top: 1rem; font-size: 0.7rem; text-align: center; opacity: 0.7;">
-                ${similarPlayers.details || `Based on season ${season} | Candidates: ${similarPlayers.candidates || 'N/A'}`}
+                ${similarPlayers.details || `На основе сезона ${season} | Кандидатов: ${similarPlayers.candidates || 'Н/Д'}`}
             </div>
         </div>
     `;
@@ -380,7 +385,7 @@ async function updateSimilarPlayersBlock(similarPlayers, season) {
         statsGrid.insertAdjacentHTML('afterend', similarityHtml);
     }
     
-    showFilterMessage(`Found ${similarPlayersDetails.length} similar players`, 'success');
+    showFilterMessage(`Найдено ${similarPlayersDetails.length} похожих игроков`, 'success');
 }
 
 async function loadPlayerStatsWithFilters(season, dateFrom, dateTo) {
@@ -401,17 +406,17 @@ async function loadPlayerStatsWithFilters(season, dateFrom, dateTo) {
         url += `?${params.join('&')}`;
     }
     
-    console.log('Fetching stats from:', url);
+    console.log('Загрузка статистики из:', url);
     try {
         const response = await fetch(url);
         if (response.ok) {
             return await response.json();
         } else {
-            console.error('Stats response not OK:', response.status);
+            console.error('Статистика: ответ не OK:', response.status);
             return null;
         }
     } catch (error) {
-        console.error('Error fetching stats:', error);
+        console.error('Ошибка загрузки статистики:', error);
         return null;
     }
 }
@@ -420,24 +425,24 @@ async function applySeasonFilter() {
     const seasonFilter = document.getElementById('season-filter').value;
     
     if (!seasonFilter) {
-        alert('Please select a season');
+        alert('Пожалуйста, выберите сезон');
         return;
     }
     
-    console.log('Applying season filter:', seasonFilter);
+    console.log('Применение фильтра по сезону:', seasonFilter);
     
     const statsGrid = document.getElementById('player-stats-grid');
-    statsGrid.innerHTML = '<div class="loading-spinner">Loading statistics...</div>';
+    statsGrid.innerHTML = '<div class="loading-spinner">Загрузка статистики...</div>';
     
     const stats = await loadPlayerStatsWithFilters(seasonFilter, null, null);
     
     if (stats && Object.keys(stats).length > 0) {
         currentStats = stats;
         updateStatsGrid(stats);
-        showFilterMessage(`Showing stats for season ${seasonFilter}`);
+        showFilterMessage(`Отображается статистика за сезон ${seasonFilter}`);
     } else {
-        statsGrid.innerHTML = '<p>No stats available for selected season</p>';
-        showFilterMessage(`No data found for season ${seasonFilter}`, 'error');
+        statsGrid.innerHTML = '<p>Данные за выбранный сезон отсутствуют</p>';
+        showFilterMessage(`Данные за сезон ${seasonFilter} не найдены`, 'error');
     }
 }
 
@@ -446,32 +451,32 @@ async function applyDateFilter() {
     const dateTo = document.getElementById('date-to').value;
     
     if (!dateFrom && !dateTo) {
-        alert('Please select at least one date');
+        alert('Пожалуйста, выберите хотя бы одну дату');
         return;
     }
     
-    console.log('Applying date filter:', { dateFrom, dateTo });
+    console.log('Применение фильтра по датам:', { dateFrom, dateTo });
     
     const statsGrid = document.getElementById('player-stats-grid');
-    statsGrid.innerHTML = '<div class="loading-spinner">Loading statistics...</div>';
+    statsGrid.innerHTML = '<div class="loading-spinner">Загрузка статистики...</div>';
     
     const stats = await loadPlayerStatsWithFilters(null, dateFrom, dateTo);
     
     if (stats && Object.keys(stats).length > 0) {
         currentStats = stats;
         updateStatsGrid(stats);
-        let message = 'Showing stats';
+        let message = 'Отображаются статистические данные';
         if (dateFrom && dateTo) {
-            message += ` from ${dateFrom} to ${dateTo}`;
+            message += ` с ${dateFrom} по ${dateTo}`;
         } else if (dateFrom) {
-            message += ` from ${dateFrom}`;
+            message += ` с ${dateFrom}`;
         } else if (dateTo) {
-            message += ` until ${dateTo}`;
+            message += ` до ${dateTo}`;
         }
         showFilterMessage(message);
     } else {
-        statsGrid.innerHTML = '<p>No stats available for selected date range</p>';
-        showFilterMessage('No data found for selected date range', 'error');
+        statsGrid.innerHTML = '<p>Данные за выбранный диапазон отсутствуют</p>';
+        showFilterMessage('Данные за выбранный диапазон отсутствуют', 'error');
     }
 }
 
@@ -509,15 +514,15 @@ function resetFilters() {
     document.getElementById('date-to').value = '';
     
     const statsGrid = document.getElementById('player-stats-grid');
-    statsGrid.innerHTML = '<div class="loading-spinner">Loading statistics...</div>';
+    statsGrid.innerHTML = '<div class="loading-spinner">Загрузка статистики...</div>';
     
     loadPlayerStatsWithFilters(null, null, null).then(stats => {
         if (stats && Object.keys(stats).length > 0) {
             currentStats = stats;
             updateStatsGrid(stats);
-            showFilterMessage('Showing all-time statistics');
+            showFilterMessage('Отображаются статистические данные за все время');
         } else {
-            statsGrid.innerHTML = '<p>No stats available</p>';
+            statsGrid.innerHTML = '<p>Данные отсутствуют</p>';
         }
     });
 }
@@ -526,23 +531,23 @@ function updateStatsGrid(stats) {
     const statsGrid = document.getElementById('player-stats-grid');
     
     if (!stats || Object.keys(stats).length === 0) {
-        statsGrid.innerHTML = '<p>No statistics available for this period</p>';
+        statsGrid.innerHTML = '<p>Статистика за выбранный период недоступна</p>';
         return;
     }
     
     const statsToShow = [
-        { key: 'total_matches', label: 'Matches', isPercent: false },
-        { key: 'goals', label: 'Goals', isPercent: false },
-        { key: 'assists', label: 'Assists', isPercent: false },
-        { key: 'avg_rating', label: 'Avg Rating', isPercent: false },
-        { key: 'minutes_played', label: 'Minutes', isPercent: false },
-        { key: 'yellow_cards', label: 'Yellow Cards', isPercent: false },
-        { key: 'red_cards', label: 'Red Cards', isPercent: false },
-        { key: 'total_tackles', label: 'Tackles', isPercent: false },
-        { key: 'interceptions', label: 'Interceptions', isPercent: false },
-        { key: 'saves', label: 'Saves', isPercent: false },
-        { key: 'pass_accuracy', label: 'Pass Accuracy', isPercent: true },
-        { key: 'dribble_accuracy', label: 'Dribble Accuracy', isPercent: true }
+        { key: 'total_matches', label: 'Матчи', isPercent: false },
+        { key: 'goals', label: 'Голы', isPercent: false },
+        { key: 'assists', label: 'Передачи', isPercent: false },
+        { key: 'avg_rating', label: 'Ср. рейтинг', isPercent: false },
+        { key: 'minutes_played', label: 'Минуты', isPercent: false },
+        { key: 'yellow_cards', label: 'Желтые карточки', isPercent: false },
+        { key: 'red_cards', label: 'Красные карточки', isPercent: false },
+        { key: 'total_tackles', label: 'Отборы', isPercent: false },
+        { key: 'interceptions', label: 'Перехваты', isPercent: false },
+        { key: 'saves', label: 'Сейвы', isPercent: false },
+        { key: 'pass_accuracy', label: 'Точность пасов', isPercent: true },
+        { key: 'dribble_accuracy', label: 'Точность дриблинга', isPercent: true }
     ];
     
     const passAccuracy = stats.complete_passes && stats.pass_attempts && stats.pass_attempts > 0
@@ -572,12 +577,12 @@ function updateStatsGrid(stats) {
     
     if (stats.goals && stats.minutes_played && stats.minutes_played > 0) {
         const goalsPer90 = (stats.goals / stats.minutes_played) * 90;
-        displayStats.push({ label: 'Goals/90', value: goalsPer90.toFixed(2) });
+        displayStats.push({ label: 'Голов/90', value: goalsPer90.toFixed(2) });
     }
     
     if (stats.saves && stats.minutes_played && stats.minutes_played > 0) {
         const savesPer90 = (stats.saves / stats.minutes_played) * 90;
-        displayStats.push({ label: 'Saves/90', value: savesPer90.toFixed(2) });
+        displayStats.push({ label: 'Сейвов/90', value: savesPer90.toFixed(2) });
     }
     
     if (displayStats.length > 0) {
@@ -588,35 +593,35 @@ function updateStatsGrid(stats) {
             </div>
         `).join('');
     } else {
-        statsGrid.innerHTML = '<p>No stats available</p>';
+        statsGrid.innerHTML = '<p>Статистика недоступна</p>';
     }
 }
 
 async function loadPlayerData() {
     try {
-        console.log('Loading player data for ID:', playerId);
+        console.log('Загрузка данных игрока для ID:', playerId);
         
         const [details, teams, fixtures] = await Promise.all([
             playerAPI.getDetails(playerId).catch(e => {
-                console.error('Details error:', e);
+                console.error('Ошибка деталей:', e);
                 return null;
             }),
             playerAPI.getTeams(playerId).catch(e => {
-                console.error('Teams error:', e);
+                console.error('Ошибка команд:', e);
                 return null;
             }),
             playerAPI.getFixtures(playerId).catch(e => {
-                console.error('Fixtures error:', e);
+                console.error('Ошибка матчей:', e);
                 return null;
             }),
         ]);
 
-        console.log('Player details:', details);
-        console.log('Player teams:', teams);
-        console.log('Player fixtures:', fixtures);
+        console.log('Детали игрока:', details);
+        console.log('Команды игрока:', teams);
+        console.log('Матчи игрока:', fixtures);
 
         if (!details) {
-            document.getElementById('player-detail').innerHTML = '<p class="loading">Player not found</p>';
+            document.getElementById('player-detail').innerHTML = '<p class="loading">Игрок не найден</p>';
             return;
         }
 
@@ -648,7 +653,7 @@ async function loadPlayerData() {
                 option.textContent = season;
                 seasonFilter.appendChild(option);
             });
-            console.log('Seasons loaded:', availableSeasons.length);
+            console.log('Сезонов загружено:', availableSeasons.length);
         }
         
         // Заполняем сезоны для выбора в настройках похожих игроков
@@ -660,8 +665,8 @@ async function loadPlayerData() {
             updateStatsGrid(stats);
         }
 
-        // Update header with photo
-        const playerName = `${details.first_name || ''} ${details.last_name || ''}`.trim() || 'Player';
+        // Обновляем заголовок с фото
+        const playerName = `${details.first_name || ''} ${details.last_name || ''}`.trim() || 'Игрок';
         const photo = details.url_photo || '';
         const nationFlag = details.nation?.url_flag || '';
         const nationName = details.nation?.name || '';
@@ -673,7 +678,7 @@ async function loadPlayerData() {
 
         const positionSpan = document.getElementById('player-position');
         if (details.position) {
-            const positionNames = { 'G': 'Goalkeeper', 'D': 'Defender', 'M': 'Midfielder', 'F': 'Forward' };
+            const positionNames = { 'G': 'Вратарь', 'D': 'Защитник', 'M': 'Полузащитник', 'F': 'Нападающий' };
             positionSpan.textContent = positionNames[details.position] || details.position;
         }
 
@@ -685,7 +690,7 @@ async function loadPlayerData() {
         // Дополнительная информация
         if (details.date_of_birth) {
             const birthDate = new Date(details.date_of_birth);
-            const formattedDate = birthDate.toLocaleDateString('en-GB', {
+            const formattedDate = birthDate.toLocaleDateString('ru-RU', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
@@ -693,40 +698,40 @@ async function loadPlayerData() {
             const ageDifMs = Date.now() - birthDate.getTime();
             const ageDate = new Date(ageDifMs);
             const age = Math.abs(ageDate.getUTCFullYear() - 1970);
-            document.getElementById('player-birthdate').innerHTML = `${formattedDate} <span style="color: #666;">(${age} years)</span>`;
+            document.getElementById('player-birthdate').innerHTML = `${formattedDate} <span style="color: #666;">(${age} лет)</span>`;
         } else {
-            document.getElementById('player-birthdate').textContent = 'Not specified';
+            document.getElementById('player-birthdate').textContent = 'Не указано';
         }
 
         if (details.height) {
             const heightCm = details.height;
             const heightFeet = Math.floor(heightCm / 30.48);
             const heightInches = Math.round((heightCm % 30.48) / 2.54);
-            document.getElementById('player-height').innerHTML = `${heightCm} cm (${heightFeet}'${heightInches}")`;
+            document.getElementById('player-height').innerHTML = `${heightCm} см (${heightFeet}'${heightInches}")`;
         } else {
-            document.getElementById('player-height').textContent = 'Not specified';
+            document.getElementById('player-height').textContent = 'Не указано';
         }
 
         if (details.preffered_foot) {
-            const footNames = { 'Left': '👈 Left', 'Right': '👉 Right', 'Both': '✌️ Both' };
+            const footNames = { 'Left': '👈 Левая', 'Right': '👉 Правая', 'Both': '✌️ Обе' };
             document.getElementById('player-foot').innerHTML = footNames[details.preffered_foot] || details.preffered_foot;
         } else {
-            document.getElementById('player-foot').textContent = 'Not specified';
+            document.getElementById('player-foot').textContent = 'Не указано';
         }
 
         if (details.current_status) {
             const statusBadge = details.current_status === 'Active' 
-                ? '<span style="color: #2ecc71;">✅ Active</span>' 
-                : '<span style="color: #e74c3c;">❌ Inactive</span>';
+                ? '<span style="color: #2ecc71;">✅ Активен</span>' 
+                : '<span style="color: #e74c3c;">❌ Неактивен</span>';
             document.getElementById('player-status').innerHTML = statusBadge;
         } else {
-            document.getElementById('player-status').textContent = 'Unknown';
+            document.getElementById('player-status').textContent = 'Неизвестно';
         }
 
         // Загружаем похожих игроков с параметрами по умолчанию
         await loadSimilarPlayers(false);
 
-        // Teams (без колонки Position)
+        // Команды (без колонки Position)
         if (teams && Array.isArray(teams)) {
             const tbody = document.getElementById('teams-tbody');
             tbody.innerHTML = teams.map(team => `
@@ -735,12 +740,12 @@ async function loadPlayerData() {
                         ${team.url_logo ? `<img src="${team.url_logo}" alt="${team.name}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
                         <strong>${team.name}</strong>
                     </td>
-                    <td>${team.season || 'N/A'}</td>
+                    <td>${team.season || 'Н/Д'}</td>
                 </tr>
             `).join('');
         }
 
-        // Fixtures с пагинацией
+        // Матчи с пагинацией
         fixturesCurrentPage = 1;
         await loadFixturesWithPagination(fixturesCurrentPage, false);
         
@@ -752,17 +757,17 @@ async function loadPlayerData() {
                     isFavorite = favorites.some(f => f.athlete_id === parseInt(playerId));
                     const btn = document.getElementById('fav-btn');
                     if (btn) {
-                        btn.textContent = isFavorite ? '★ Remove from Favorites' : '★ Add to Favorites';
+                        btn.textContent = isFavorite ? '★ Удалить из избранного' : '★ Добавить в избранное';
                     }
                 }
             } catch (e) {
-                console.error('Error checking favorites:', e);
+                console.error('Ошибка проверки избранного:', e);
             }
         }
         
     } catch (error) {
-        console.error('Error loading player data:', error);
-        document.getElementById('player-detail').innerHTML = '<p class="loading">Error loading player data. Please try again.</p>';
+        console.error('Ошибка загрузки данных игрока:', error);
+        document.getElementById('player-detail').innerHTML = '<p class="loading">Ошибка загрузки данных игрока. Пожалуйста, попробуйте снова.</p>';
     }
 }
 
@@ -804,15 +809,15 @@ async function toggleFavorite() {
         if (isFavorite) {
             await playerAPI.removeFavorite(playerId);
             isFavorite = false;
-            btn.textContent = '★ Add to Favorites';
+            btn.textContent = '★ Добавить в избранное';
         } else {
             await playerAPI.addFavorite(playerId);
             isFavorite = true;
-            btn.textContent = '★ Remove from Favorites';
+            btn.textContent = '★ Удалить из избранного';
         }
     } catch (error) {
-        console.error('Error toggling favorite:', error);
-        showFilterMessage('Failed to update favorites', 'error');
+        console.error('Ошибка переключения избранного:', error);
+        showFilterMessage('Не удалось обновить избранное', 'error');
     }
 }
 
@@ -834,6 +839,6 @@ function goToPlayer(id) {
     }
 }
 
-// Делаем функции доступными глобально для кнопки Try Again и Load More
+// Делаем функции доступными глобально для кнопки "Попробовать снова" и "Показать ещё"
 window.loadSimilarPlayers = loadSimilarPlayers;
 window.loadMoreFixtures = loadMoreFixtures;

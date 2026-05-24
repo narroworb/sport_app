@@ -54,6 +54,15 @@ type Tournament struct {
 	URLLogo string  `json:"url_logo,omitempty"`
 }
 
+type TournamentWithSeason struct {
+	Name    string `json:"name,omitempty"`
+	URLLogo string `json:"url_logo,omitempty"`
+	Seasons []struct {
+		Season string `json:"season,omitempty"`
+		ID     uint32 `json:"tournament_id"`
+	} `json:"seasons"`
+}
+
 type Team struct {
 	Name    string `json:"name,omitempty"`
 	ID      uint32 `json:"team_id"`

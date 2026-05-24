@@ -43,19 +43,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function performSearch() {
+    // Проверяем существование элементов с защитой
     const searchInput = document.getElementById('search-input');
-    if (!searchInput) return;
+    if (!searchInput) {
+        console.error('Элемент search-input не найден');
+        return;
+    }
     
     const query = searchInput.value.trim();
-    const resultsWrapper = document.getElementById('search-results-wrapper');
     
-    if (!resultsWrapper) return;
+    const resultsWrapper = document.getElementById('search-results-wrapper');
+    if (!resultsWrapper) {
+        console.error('Элемент search-results-wrapper не найден');
+        // Пытаемся найти альтернативный контейнер или создаём его
+        const container = document.querySelector('.container .section');
+        if (container) {
+            const newWrapper = document.createElement('div');
+            newWrapper.id = 'search-results-wrapper';
+            container.appendChild(newWrapper);
+            resultsWrapper = newWrapper;
+        } else {
+            return;
+        }
+    }
     
     if (!query) {
         resultsWrapper.innerHTML = '<p class="loading">Введите поисковый запрос</p>';
         return;
     }
 
+    // Обновляем URL без перезагрузки
     window.history.pushState({}, '', `/search/${encodeURIComponent(query)}`);
 
     resultsWrapper.innerHTML = '<div class="search-loading">🔍 Поиск...</div>';

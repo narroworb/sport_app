@@ -36,6 +36,7 @@ type AnalyticDatabaseInterface interface {
 	GetTournamentTeamsStatsByID(ctx context.Context, id uint32) ([]models.TeamStatsInPeriod, error)
 	GetTournamentPlayersStatsByID(ctx context.Context, id, limit, offset uint32) ([]models.PlayerStatsInPeriod, error)
 	GetTournamentTableGraphByID(ctx context.Context, tournamentID uint32) ([][]models.ShortTableRow, error)
+	GetAllTournaments(ctx context.Context) (map[string]models.TournamentWithSeason, error)
 	GetManagerFullStats(ctx context.Context, id uint32) (map[string]models.ManagerStatsInPeriod, error)
 	GetManagerStatsBySeason(ctx context.Context, id uint32) (map[string]models.ManagerStatsInPeriod, error)
 	GetManagerStatsByTeam(ctx context.Context, id uint32) (map[string]models.ManagerStatsInPeriod, error)
@@ -55,6 +56,15 @@ type AnalyticDatabaseInterface interface {
 	UpdateBatchManagersIndexedStatus(ctx context.Context, ids []uint32) error
 	UpdateBatchTeamsIndexedStatus(ctx context.Context, ids []uint32) error
 	UpdateBatchTournamentsIndexedStatus(ctx context.Context, ids []uint32) error
+
+	// Creation of user-submitted entities into analytics storage (ClickHouse)
+	CreatePlayer(ctx context.Context, userID int64, payload []byte) (int64, error)
+	CreateTeam(ctx context.Context, userID int64, payload []byte) (int64, error)
+	CreateTournament(ctx context.Context, userID int64, payload []byte) (int64, error)
+	CreateManager(ctx context.Context, userID int64, payload []byte) (int64, error)
+	CreateFixture(ctx context.Context, userID int64, payload []byte) (int64, error)
+	CreateMatchStats(ctx context.Context, userID int64, payload []byte) (int64, error)
+	CreateTournamentTable(ctx context.Context, userID int64, payload []byte) (int64, error)
 }
 
 type CacheInterface interface {
@@ -78,6 +88,8 @@ type TransactionDatabaseInterface interface {
 	DeleteFavoriteManagerByID(ctx context.Context, userID int64, managerID int64) error
 	DeleteFavoriteTeamByID(ctx context.Context, userID int64, teamID int64) error
 	DeleteFavoriteTournamentByID(ctx context.Context, userID int64, tournamentID int64) error
+
+	// (no creation methods here; transactional DB used only for auth/transactions)
 }
 
 type SearchDatabaseInterface interface {

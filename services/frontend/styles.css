@@ -155,6 +155,83 @@ body {
     font-size: 0.9rem;
 }
 
+.form-panel {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid #e7edf5;
+    border-radius: 22px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    padding: 1.7rem;
+}
+
+.create-form-grid {
+    display: grid;
+    gap: 1.35rem;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.create-form-section {
+    display: grid;
+    gap: 0.95rem;
+}
+
+.create-form-section h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #243449;
+}
+
+.field-group {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+}
+
+.field-group label {
+    color: #4b5d74;
+}
+
+.field-group input,
+.field-group textarea,
+.field-group select {
+    width: 100%;
+    border: 1px solid #dfe5ed;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    font-size: 0.96rem;
+    background: #fff;
+    color: #243449;
+}
+
+.field-group input:focus,
+.field-group textarea:focus,
+.field-group select:focus {
+    outline: none;
+    border-color: #5e94f5;
+    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.12);
+}
+
+.helper-text {
+    font-size: 0.88rem;
+    color: #6f7f96;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 140px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.section-header span {
+    color: #738199;
+    font-size: 0.9rem;
+}
+
 /* Auth Panel */
 .auth-panel {
     position: fixed;
@@ -1606,5 +1683,197 @@ body {
     .score {
         font-size: 1rem;
         min-width: 50px;
+    }
+}
+
+/* Стили для страницы добавления данных - компактные сетки */
+.stats-section {
+    grid-column: span 1;
+}
+
+.stats-two-columns {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.stats-three-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+.nested-card .field-group {
+    margin-bottom: 0;
+}
+
+.nested-card .field-group label {
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nested-card .field-group input,
+.nested-card .field-group select {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+/* Адаптив для статистики */
+@media (max-width: 900px) {
+    .stats-two-columns,
+    .stats-three-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1200px) and (min-width: 901px) {
+    .stats-three-columns {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Выпадающее меню турниров */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-btn {
+    background: transparent;
+    color: #3b4a5a;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.25s ease;
+    font-family: inherit;
+}
+
+.dropdown-btn:hover {
+    color: #1763c7;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background: white;
+    min-width: 280px;
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    z-index: 1000;
+    top: 100%;
+    left: 0;
+    margin-top: 0.5rem;
+}
+
+.dropdown-content.show {
+    display: block;
+    animation: fadeIn 0.2s ease;
+}
+
+.dropdown-loading {
+    padding: 1rem;
+    text-align: center;
+    color: #666;
+}
+
+.tournament-group {
+    border-bottom: 1px solid #e9ecef;
+}
+
+.tournament-group-header {
+    padding: 0.75rem 1rem;
+    background: #f8f9fa;
+    font-weight: 700;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.tournament-group-header:hover {
+    background: #e9ecef;
+}
+
+.tournament-group-header img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+.tournament-group-header .arrow {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.tournament-group-header .arrow.open {
+    transform: rotate(180deg);
+}
+
+.tournament-seasons {
+    display: none;
+    padding: 0.5rem 0;
+    background: white;
+}
+
+.tournament-seasons.show {
+    display: block;
+}
+
+.tournament-season-item {
+    display: block;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    text-decoration: none;
+    color: #495057;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.tournament-season-item:hover {
+    background: #f1f3f5;
+    color: #1763c7;
+}
+
+.tournament-season-item span {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.season-badge {
+    font-size: 0.7rem;
+    color: #6c757d;
+    background: #e9ecef;
+    padding: 0.15rem 0.4rem;
+    border-radius: 10px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .dropdown-content {
+        position: fixed;
+        top: auto;
+        left: 1rem;
+        right: 1rem;
+        width: calc(100% - 2rem);
+        max-height: 60vh;
     }
 }

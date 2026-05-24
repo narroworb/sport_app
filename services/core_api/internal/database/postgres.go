@@ -301,3 +301,4 @@ func (p *PostgresDB) DeleteFavoriteTournamentByID(ctx context.Context, userID in
 
 	return tx.Commit()
 }
+

@@ -2,8 +2,12 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -12,8 +16,20 @@ import (
 	"github.com/narroworb/core_api/internal/models"
 )
 
+var ErrProtectedTournament = errors.New("protected tournament cannot be modified by users")
+
 type ClichouseDB struct {
-	conn driver.Conn
+	conn  driver.Conn
+	maxID struct {
+		athlete                 uint32
+		manager                 uint32
+		team                    uint32
+		tournament              uint32
+		match                   uint32
+		footballPlayerMatchStat uint32
+		footballGoalieMatchStat uint32
+		teamPerformance         uint32
+	}
 }
 
 func NewClickhouseDB() (*ClichouseDB, error) {
@@ -43,11 +59,69 @@ func NewClickhouseDB() (*ClichouseDB, error) {
 		conn: conn,
 	}
 
+	if err := c.initCounters(); err != nil {
+		return nil, fmt.Errorf("error initializing id counters: %v", err)
+	}
+
 	return c, nil
 }
 
 func (c *ClichouseDB) Close() {
 	c.conn.Close()
+}
+
+func (c *ClichouseDB) initCounters() error {
+	queries := map[*uint32]string{
+		&c.maxID.athlete:                 "SELECT ifNull(max(athlete_id), 0) FROM Athletes",
+		&c.maxID.manager:                 "SELECT ifNull(max(manager_id), 0) FROM Managers",
+		&c.maxID.team:                    "SELECT ifNull(max(team_id), 0) FROM Teams",
+		&c.maxID.tournament:              "SELECT ifNull(max(tournament_id), 0) FROM Tournaments",
+		&c.maxID.match:                   "SELECT ifNull(max(match_id), 0) FROM Matches",
+		&c.maxID.footballPlayerMatchStat: "SELECT ifNull(max(stat_id), 0) FROM Football_Player_Match_Stats",
+		&c.maxID.footballGoalieMatchStat: "SELECT ifNull(max(stat_id), 0) FROM Football_Goalie_Match_Stats",
+		&c.maxID.teamPerformance:         "SELECT ifNull(max(performance_id), 0) FROM Team_Tournament_Performances",
+	}
+
+	for ptr, q := range queries {
+		var val uint32
+		if err := c.conn.QueryRow(context.Background(), q).Scan(&val); err != nil {
+			return err
+		}
+		atomic.StoreUint32(ptr, val)
+	}
+	return nil
+}
+
+func (c *ClichouseDB) NextAthleteID() uint32 {
+	return atomic.AddUint32(&c.maxID.athlete, 1)
+}
+
+func (c *ClichouseDB) NextManagerID() uint32 {
+	return atomic.AddUint32(&c.maxID.manager, 1)
+}
+
+func (c *ClichouseDB) NextTeamID() uint32 {
+	return atomic.AddUint32(&c.maxID.team, 1)
+}
+
+func (c *ClichouseDB) NextTournamentID() uint32 {
+	return atomic.AddUint32(&c.maxID.tournament, 1)
+}
+
+func (c *ClichouseDB) NextMatchID() uint32 {
+	return atomic.AddUint32(&c.maxID.match, 1)
+}
+
+func (c *ClichouseDB) NextFootballPlayerMatchStatID() uint32 {
+	return atomic.AddUint32(&c.maxID.footballPlayerMatchStat, 1)
+}
+
+func (c *ClichouseDB) NextFootballGoalieMatchStatID() uint32 {
+	return atomic.AddUint32(&c.maxID.footballGoalieMatchStat, 1)
+}
+
+func (c *ClichouseDB) NextTeamTournamentPerformanceID() uint32 {
+	return atomic.AddUint32(&c.maxID.teamPerformance, 1)
 }
 
 func (c *ClichouseDB) GetPlayerByID(ctx context.Context, id uint32) (models.Player, error) {
@@ -119,6 +193,43 @@ func (c *ClichouseDB) GetTournamentByID(ctx context.Context, id uint32) (models.
 	tournament.ID = id
 
 	return tournament, nil
+}
+
+func (c *ClichouseDB) GetAllTournaments(ctx context.Context) (map[string]models.TournamentWithSeason, error) {
+	rows, err := c.conn.Query(ctx, "SELECT t.tournament_id, t.name, season, logo_url FROM Tournaments t LEFT JOIN Tournament_Logos tl ON t.name=tl.tournament_name ORDER BY name")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tournaments := make(map[string]models.TournamentWithSeason)
+	for rows.Next() {
+		var name, season string
+		var logo sql.NullString
+		var id uint32
+		if err := rows.Scan(&id, &name, &season, &logo); err != nil {
+			return map[string]models.TournamentWithSeason{}, err
+		}
+
+		if _, exists := tournaments[name]; !exists {
+			tournaments[name] = models.TournamentWithSeason{
+				Name: name,
+				Seasons: []struct {
+					Season string "json:\"season,omitempty\""
+					ID     uint32 "json:\"tournament_id\""
+				}{},
+				URLLogo: logo.String,
+			}
+		}
+		entry := tournaments[name]
+		entry.Seasons = append(entry.Seasons, struct {
+			Season string "json:\"season,omitempty\""
+			ID     uint32 "json:\"tournament_id\""
+		}{Season: season, ID: id})
+		tournaments[name] = entry
+	}
+
+	return tournaments, nil
 }
 
 func (c *ClichouseDB) GetPlayerStatsBySeason(ctx context.Context, filter models.PlayerStatsFilter) (models.PlayerStatsInPeriod, error) {
@@ -476,6 +587,326 @@ func (c *ClichouseDB) GetPlayerFixtures(ctx context.Context, id, limit, offset u
 	}
 
 	return matches, nil
+}
+
+func parseDate(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	parsed, err := time.Parse("2006-01-02", value)
+	if err == nil {
+		return parsed, nil
+	}
+	return time.Parse(time.RFC3339, value)
+}
+
+type createPlayerPayload struct {
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Position      string `json:"position"`
+	DateOfBirth   string `json:"date_of_birth"`
+	Height        uint16 `json:"height"`
+	PreferredFoot string `json:"preffered_foot"`
+	Nation        struct {
+		Name    string `json:"name"`
+		URLFlag string `json:"url_flag,omitempty"`
+	} `json:"nation"`
+	CurrentStatus string `json:"current_status"`
+	PhotoURL      string `json:"url_photo,omitempty"`
+}
+
+type createMatchPayload struct {
+	Date        string            `json:"date"`
+	HomeTeam    models.Team       `json:"home_team"`
+	AwayTeam    models.Team       `json:"away_team"`
+	Tournament  models.Tournament `json:"tournament"`
+	HomeGoals   int16             `json:"home_team_score"`
+	AwayGoals   int16             `json:"away_team_score"`
+	Round       uint16            `json:"round"`
+	HomeManager models.Manager    `json:"home_team_manager"`
+	AwayManager models.Manager    `json:"away_team_manager"`
+	Status      string            `json:"status"`
+}
+
+type createMatchStatsPayload struct {
+	Players []models.PlayerStatsInMatch `json:"players,omitempty"`
+	Goalies []models.GoalieStatsInMatch `json:"goalies,omitempty"`
+	Teams   models.TeamMatchStats       `json:"teams,omitempty"`
+}
+
+type createTournamentTablePayload struct {
+	TournamentID uint32            `json:"tournament_id"`
+	Rows         []models.TableRow `json:"rows"`
+}
+
+func (c *ClichouseDB) ensureFlag(ctx context.Context, nation, flagURL string) error {
+	if nation == "" {
+		return nil
+	}
+	var count uint64
+	if err := c.conn.QueryRow(ctx, "SELECT count() FROM National_Flags WHERE nation=$1", nation).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return c.conn.Exec(ctx, `INSERT INTO National_Flags (nation, flag_url) VALUES ($1, $2)`, nation, flagURL)
+}
+
+func (c *ClichouseDB) ensureAthletePhoto(ctx context.Context, athleteID uint32, photoURL string) error {
+	var count uint64
+	if err := c.conn.QueryRow(ctx, "SELECT count() FROM Athlete_Photos WHERE athlete_id=$1", athleteID).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return c.conn.Exec(ctx, `INSERT INTO Athlete_Photos (athlete_id, photo_url) VALUES ($1, $2)`, athleteID, photoURL)
+}
+
+func (c *ClichouseDB) ensureManagerPhoto(ctx context.Context, managerID uint32, photoURL string) error {
+	var count uint64
+	if err := c.conn.QueryRow(ctx, "SELECT count() FROM Manager_Photos WHERE manager_id=$1", managerID).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return c.conn.Exec(ctx, `INSERT INTO Manager_Photos (manager_id, photo_url) VALUES ($1, $2)`, managerID, photoURL)
+}
+
+func (c *ClichouseDB) ensureTeamLogo(ctx context.Context, teamID uint32, logoURL string) error {
+	var count uint64
+	if err := c.conn.QueryRow(ctx, "SELECT count() FROM Team_Logos WHERE team_id=$1", teamID).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return c.conn.Exec(ctx, `INSERT INTO Team_Logos (team_id, logo_url) VALUES ($1, $2)`, teamID, logoURL)
+}
+
+func (c *ClichouseDB) ensureTournamentLogo(ctx context.Context, tournamentName, logoURL string) error {
+	if tournamentName == "" {
+		return nil
+	}
+	var count uint64
+	if err := c.conn.QueryRow(ctx, "SELECT count() FROM Tournament_Logos WHERE tournament_name=$1", tournamentName).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return c.conn.Exec(ctx, `INSERT INTO Tournament_Logos (tournament_name, logo_url) VALUES ($1, $2)`, tournamentName, logoURL)
+}
+
+func (c *ClichouseDB) CreatePlayer(ctx context.Context, userID int64, payload []byte) (int64, error) {
+	var p createPlayerPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return 0, err
+	}
+	dateOfBirth, err := parseDate(p.DateOfBirth)
+	if err != nil {
+		return 0, err
+	}
+	id := c.NextAthleteID()
+	if err := c.conn.Exec(ctx,
+		`INSERT INTO Athletes (athlete_id, sport_id, first_name, last_name, position, date_of_birth, height, preferred_foot_or_handness, nation, current_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		id, 1, p.FirstName, p.LastName, p.Position, dateOfBirth, p.Height, p.PreferredFoot, p.Nation.Name, p.CurrentStatus); err != nil {
+		return 0, err
+	}
+	if err := c.ensureFlag(ctx, p.Nation.Name, p.Nation.URLFlag); err != nil {
+		return 0, err
+	}
+	if err := c.ensureAthletePhoto(ctx, id, p.PhotoURL); err != nil {
+		return 0, err
+	}
+	return int64(id), nil
+}
+
+func (c *ClichouseDB) CreateTeam(ctx context.Context, userID int64, payload []byte) (int64, error) {
+	var t models.Team
+	if err := json.Unmarshal(payload, &t); err != nil {
+		return 0, err
+	}
+	id := c.NextTeamID()
+	if err := c.conn.Exec(ctx, `INSERT INTO Teams (team_id, name) VALUES ($1, $2)`, id, t.Name); err != nil {
+		return 0, err
+	}
+	if err := c.ensureTeamLogo(ctx, id, t.URLLogo); err != nil {
+		return 0, err
+	}
+	return int64(id), nil
+}
+
+func (c *ClichouseDB) CreateTournament(ctx context.Context, userID int64, payload []byte) (int64, error) {
+	var t models.Tournament
+	if err := json.Unmarshal(payload, &t); err != nil {
+		return 0, err
+	}
+	id := c.NextTournamentID()
+	if err := c.conn.Exec(ctx,
+		`INSERT INTO Tournaments (tournament_id, sport_id, name, country, season)
+		VALUES ($1, $2, $3, $4, $5)`,
+		id, 1, t.Name, t.Country.Name, t.Season); err != nil {
+		return 0, err
+	}
+	if err := c.ensureFlag(ctx, t.Country.Name, t.Country.URLFlag); err != nil {
+		return 0, err
+	}
+	if err := c.ensureTournamentLogo(ctx, t.Name, t.URLLogo); err != nil {
+		return 0, err
+	}
+	return int64(id), nil
+}
+
+func (c *ClichouseDB) CreateManager(ctx context.Context, userID int64, payload []byte) (int64, error) {
+	var m models.Manager
+	if err := json.Unmarshal(payload, &m); err != nil {
+		return 0, err
+	}
+	id := c.NextManagerID()
+	if err := c.conn.Exec(ctx,
+		`INSERT INTO Managers (manager_id, first_name, last_name, nation, yellow_cards, red_cards)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, m.FirstName, m.LastName, m.Nation.Name, m.YellowCards, m.RedCards); err != nil {
+		return 0, err
+	}
+	if err := c.ensureFlag(ctx, m.Nation.Name, m.Nation.URLFlag); err != nil {
+		return 0, err
+	}
+	if err := c.ensureManagerPhoto(ctx, id, m.URLPhoto); err != nil {
+		return 0, err
+	}
+	return int64(id), nil
+}
+
+func (c *ClichouseDB) CreateFixture(ctx context.Context, userID int64, payload []byte) (int64, error) {
+	var m createMatchPayload
+	if err := json.Unmarshal(payload, &m); err != nil {
+		return 0, err
+	}
+	matchDate, err := parseDate(m.Date)
+	if err != nil {
+		return 0, err
+	}
+	if m.Tournament.ID < 100 {
+		return 0, fmt.Errorf("%w: tournament_id %d is protected", ErrProtectedTournament, m.Tournament.ID)
+	}
+	id := c.NextMatchID()
+	if err := c.conn.Exec(ctx,
+		`INSERT INTO Matches (match_id, tournament_id, date, home_team_id, away_team_id, home_score, away_score, round, home_team_manager_id, away_team_manager_id, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		id, m.Tournament.ID, matchDate, m.HomeTeam.ID, m.AwayTeam.ID, m.HomeGoals, m.AwayGoals, m.Round, m.HomeManager.ID, m.AwayManager.ID, m.Status); err != nil {
+		return 0, err
+	}
+	return int64(id), nil
+}
+
+func (c *ClichouseDB) CreateMatchStats(ctx context.Context, userID int64, payload []byte) (int64, error) {
+	var p createMatchStatsPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return 0, err
+	}
+
+	var firstID int64
+	for _, stats := range p.Players {
+		id := c.NextFootballPlayerMatchStatID()
+		var startPlayer, captain, homeTeamPlayer uint8
+		if stats.StartPlayer {
+			startPlayer = 1
+		}
+		if stats.Captain {
+			captain = 1
+		}
+		if stats.HomeTeamPlayer {
+			homeTeamPlayer = 1
+		}
+		if err := c.conn.Exec(ctx,
+			`INSERT INTO Football_Player_Match_Stats (stat_id, match_id, athlete_id, start_player, rating, minutes_played, goals, assists, blocked_shots, interceptions, total_tackles,
+				dribbled_past, duels, duels_won, fouls, was_fouled, pass_attempts, complete_passes, key_passes, shot_on_target, total_shots, dribble_attempts, complete_dribbles,
+				penalty_scored, penalty_missed, yellow_cards, red_cards, captain, home_team_player)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)`,
+			id, stats.IDMatch, stats.Player.ID, startPlayer, fmt.Sprintf("%.1f", stats.Rating), stats.MinutesPlayed, stats.Goals, stats.Assists, stats.BlockedShots, stats.Interceptions,
+			stats.TotalTackles, stats.DribbledPast, stats.Duels, stats.DuelsWon, stats.Fouls, stats.WasFouled, stats.PassAttempts, stats.CompletePasses,
+			stats.KeyPasses, stats.ShotsOnTarget, stats.TotalShots, stats.DribbleAttempts, stats.CompleteDribbles, stats.PenaltyScored, stats.PenaltyMissed,
+			stats.YellowCards, stats.RedCards, captain, homeTeamPlayer); err != nil {
+			return 0, err
+		}
+		if firstID == 0 {
+			firstID = int64(id)
+		}
+	}
+	for _, stats := range p.Goalies {
+		id := c.NextFootballGoalieMatchStatID()
+		var startPlayer, captain, homeTeamPlayer uint8
+		if stats.StartPlayer {
+			startPlayer = 1
+		}
+		if stats.Captain {
+			captain = 1
+		}
+		if stats.HomeTeamPlayer {
+			homeTeamPlayer = 1
+		}
+		if err := c.conn.Exec(ctx,
+			`INSERT INTO Football_Goalie_Match_Stats (stat_id, match_id, athlete_id, start_player, rating, minutes_played, goals, assists, goals_conceded, saves, pass_attempts,
+				complete_passes, key_passes, penalty_saved, penalty_conceded, fouls, was_fouled, yellow_cards, red_cards, captain, home_team_player)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+			id, stats.IDMatch, stats.Player.ID, startPlayer, fmt.Sprintf("%.1f", stats.Rating), stats.MinutesPlayed, stats.Goals, stats.Assists, stats.GoalsConceded, stats.Saves,
+			stats.PassAttempts, stats.CompletePasses, stats.KeyPasses, stats.PenaltySaved, stats.PenaltyConceded, stats.Fouls, stats.WasFouled,
+			stats.YellowCards, stats.RedCards, captain, homeTeamPlayer); err != nil {
+			return 0, err
+		}
+		if firstID == 0 {
+			firstID = int64(id)
+		}
+	}
+	if p.Teams.IDMatch != 0 {
+		if err := c.conn.Exec(ctx,
+			`INSERT INTO Football_Team_Match_Stats (match_id, shots_on_goal_home, shots_on_goal_away, total_shots_home, total_shots_away, blocked_shots_home, blocked_shots_away, fouls_home, fouls_away,
+				corner_kicks_home, corner_kicks_away, ball_possession_home, ball_possession_away, yellow_cards_home, yellow_cards_away, red_cards_home, red_cards_away,
+				total_passes_home, total_passes_away, complete_passes_home, complete_passes_away, offsides_home, offsides_away, shots_inside_box_home, shots_inside_box_away)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
+			p.Teams.IDMatch, p.Teams.ShotsOnGoalHome, p.Teams.ShotsOnGoalAway, p.Teams.TotalShotsHome, p.Teams.TotalShotsAway, p.Teams.BlockedShotsHome, p.Teams.BlockedShotsAway,
+			p.Teams.FoulsHome, p.Teams.FoulsAway, p.Teams.CornerKicksHome, p.Teams.CornerKicksAway, p.Teams.BallPossessionHome, p.Teams.BallPossessionAway,
+			p.Teams.YellowCardsHome, p.Teams.YellowCardsAway, p.Teams.RedCardsHome, p.Teams.RedCardsAway, p.Teams.TotalPassesHome, p.Teams.TotalPassesAway,
+			p.Teams.CompletePassesHome, p.Teams.CompletePassesAway, p.Teams.OffsidesHome, p.Teams.OffsidesAway, p.Teams.ShotsInsideBoxHome, p.Teams.ShotsInsideBoxAway); err != nil {
+			return 0, err
+		}
+	}
+	return firstID, nil
+}
+
+func (c *ClichouseDB) CreateTournamentTable(ctx context.Context, userID int64, payload []byte) (int64, error) {
+	var p createTournamentTablePayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return 0, err
+	}
+	if p.TournamentID == 0 {
+		return 0, fmt.Errorf("tournament_id is required")
+	}
+	if p.TournamentID < 100 {
+		return 0, fmt.Errorf("%w: tournament_id %d is protected", ErrProtectedTournament, p.TournamentID)
+	}
+	var firstID int64
+	for _, row := range p.Rows {
+		if row.Team.ID == 0 {
+			continue
+		}
+		id := c.NextTeamTournamentPerformanceID()
+		if err := c.conn.Exec(ctx,
+			`INSERT INTO Team_Tournament_Performances (performance_id, tournament_id, team_id, points, position, games_played, wins, draws, losses, goals_scored, goals_conceded)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			id, p.TournamentID, row.Team.ID, row.Points, row.Pos, row.Matches, row.Wins, row.Draws, row.Losses, row.ScoresFor, row.ScoresAgainst); err != nil {
+			return 0, err
+		}
+		if firstID == 0 {
+			firstID = int64(id)
+		}
+	}
+	return firstID, nil
 }
 
 func (c *ClichouseDB) GetPlayerTeams(ctx context.Context, id uint32) ([]models.TeamSeason, error) {

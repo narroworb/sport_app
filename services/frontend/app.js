@@ -2,6 +2,148 @@
 let currentUser = null;
 let currentMatchDate = new Date();
 
+// Глобальная переменная для хранения данных турниров
+let allTournamentsData = null;
+let tournamentDropdownLoaded = false;
+
+// Функция загрузки всех турниров
+async function loadAllTournaments() {
+    if (tournamentDropdownLoaded && allTournamentsData) {
+        renderTournamentDropdown(allTournamentsData);
+        return;
+    }
+    
+    const dropdownContent = document.getElementById('tournament-dropdown');
+    if (!dropdownContent) return;
+    
+    dropdownContent.innerHTML = '<div class="dropdown-loading">🏆 Загрузка турниров...</div>';
+    
+    try {
+        const response = await fetch('/api/tournament/all_tournaments');
+        if (!response.ok) {
+            throw new Error(`Ошибка загрузки: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Загружены турниры:', data);
+        allTournamentsData = data;
+        tournamentDropdownLoaded = true;
+        
+        renderTournamentDropdown(data);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки турниров:', error);
+        dropdownContent.innerHTML = '<div class="dropdown-loading">❌ Не удалось загрузить турниры</div>';
+    }
+}
+
+// Функция отрисовки выпадающего меню турниров
+function renderTournamentDropdown(data) {
+    const dropdownContent = document.getElementById('tournament-dropdown');
+    if (!dropdownContent) return;
+    
+    if (!data || Object.keys(data).length === 0) {
+        dropdownContent.innerHTML = '<div class="dropdown-loading">🏆 Турниры не найдены</div>';
+        return;
+    }
+    
+    let html = '';
+    
+    // Сортируем турниры по названию
+    const sortedTournaments = Object.keys(data).sort();
+    
+    for (const tournamentName of sortedTournaments) {
+        const tournament = data[tournamentName];
+        const logo = tournament.url_logo || '';
+        const seasons = tournament.seasons || [];
+        
+        if (seasons.length === 0) continue;
+        
+        // Генерируем уникальный ID для группы
+        const groupId = `tournament-group-${tournamentName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        
+        html += `
+            <div class="tournament-group" data-group-id="${groupId}">
+                <div class="tournament-group-header" onclick="toggleTournamentGroup('${groupId}')">
+                    ${logo ? `<img src="${logo}" alt="${escapeHtml(tournamentName)}" onerror="this.style.display='none'">` : '🏆'}
+                    <span>${escapeHtml(tournamentName)}</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div id="${groupId}" class="tournament-seasons">
+        `;
+        
+        // Сортируем сезоны по убыванию (новые сверху)
+        const sortedSeasons = [...seasons].sort((a, b) => b.season.localeCompare(a.season));
+        
+        for (const season of sortedSeasons) {
+            html += `
+                <div class="tournament-season-item" onclick="goToTournament(${season.tournament_id})">
+                    <span>
+                        📅 ${escapeHtml(season.season)}
+                        <span class="season-badge">ID: ${season.tournament_id}</span>
+                    </span>
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+    
+    dropdownContent.innerHTML = html;
+}
+
+// Функция переключения группы турниров
+function toggleTournamentGroup(groupId) {
+    const groupElement = document.getElementById(groupId);
+    const header = groupElement?.previousElementSibling;
+    
+    if (groupElement) {
+        groupElement.classList.toggle('show');
+        const arrow = header?.querySelector('.arrow');
+        if (arrow) {
+            arrow.classList.toggle('open');
+        }
+    }
+}
+
+// Функция переключения выпадающего меню
+let isDropdownOpen = false;
+
+function toggleTournamentDropdown() {
+    const dropdown = document.getElementById('tournament-dropdown');
+    if (!dropdown) return;
+    
+    if (isDropdownOpen) {
+        dropdown.classList.remove('show');
+        isDropdownOpen = false;
+    } else {
+        dropdown.classList.add('show');
+        isDropdownOpen = true;
+        
+        // Загружаем турниры при первом открытии
+        if (!tournamentDropdownLoaded) {
+            loadAllTournaments();
+        }
+    }
+}
+
+// Закрытие выпадающего меню при клике вне его
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('tournament-dropdown');
+    const dropdownBtn = document.querySelector('.dropdown-btn');
+    
+    if (dropdown && dropdownBtn && isDropdownOpen) {
+        if (!dropdown.contains(event.target) && !dropdownBtn.contains(event.target)) {
+            dropdown.classList.remove('show');
+            isDropdownOpen = false;
+        }
+    }
+});
+
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     await checkAuth();

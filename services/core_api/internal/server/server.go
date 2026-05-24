@@ -55,6 +55,14 @@ func (s *ServerRepo) Run() error {
 		r.Get("/api/player/favorite", s.handlers.GetFavouritePlayers)
 		r.Post("/api/player/{id}/favorite", s.handlers.SetFavouritePlayer)
 		r.Delete("/api/player/{id}/favorite", s.handlers.DeleteFavouritePlayer)
+		// Creation endpoints for user-contributed data
+		r.Post("/api/player", s.handlers.CreatePlayer)
+		r.Post("/api/team", s.handlers.CreateTeam)
+		r.Post("/api/tournament", s.handlers.CreateTournament)
+		r.Post("/api/manager", s.handlers.CreateManager)
+		r.Post("/api/fixture", s.handlers.CreateFixture)
+		r.Post("/api/match_stats", s.handlers.CreateMatchStats)
+		r.Post("/api/tournament/table", s.handlers.CreateTournamentTable)
 
 		r.Get("/api/team/favorite", s.handlers.GetFavouriteTeams)
 		r.Post("/api/team/{id}/favorite", s.handlers.SetFavouriteTeam)
@@ -115,6 +123,8 @@ func (s *ServerRepo) tournamentRoutes() chi.Router {
 		r.Get("/table/graph", s.handlers.GetTournamentTableGraph)
 		r.Get("/fixtures", s.handlers.GetTournamentFixtures)
 	})
+
+	r.Get("/all_tournaments", s.handlers.GetAllTournaments)
 
 	return r
 }

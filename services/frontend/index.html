@@ -18,6 +18,16 @@
             <div class="nav-menu">
                 <a href="/" class="nav-link">🏠 Главная</a>
                 <a href="/search" class="nav-link">🔍 Поиск</a>
+                <a href="/create" class="nav-link">➕ Добавить данные</a>
+                
+                <!-- Выпадающее меню турниров -->
+                <div class="dropdown">
+                    <button class="dropdown-btn" onclick="toggleTournamentDropdown()">🏆 Турниры ▼</button>
+                    <div id="tournament-dropdown" class="dropdown-content">
+                        <div class="dropdown-loading">Загрузка турниров...</div>
+                    </div>
+                </div>
+                
                 <div class="auth-section">
                     <span id="user-name" style="display:none; margin-right: 15px;"></span>
                     <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Войти</button>
@@ -37,16 +47,16 @@
             </div>
             
             <form id="login-form" class="tab-content active">
-                <input type="text" id="login-username" placeholder="👤 Логин" required>
-                <input type="password" id="login-password" placeholder="🔒 Пароль" required>
+                <input type="text" id="login-username" placeholder="👤 Логин" required autocomplete="username">
+                <input type="password" id="login-password" placeholder="🔒 Пароль" required autocomplete="current-password">
                 <button type="submit" class="btn-primary">Войти</button>
                 <div id="login-error" class="error-msg"></div>
             </form>
 
             <form id="register-form" class="tab-content">
-                <input type="text" id="register-username" placeholder="👤 Логин" required>
-                <input type="password" id="register-password" placeholder="🔒 Пароль" required>
-                <input type="password" id="register-password-confirm" placeholder="🔒 Подтвердите пароль" required>
+                <input type="text" id="register-username" placeholder="👤 Логин" required autocomplete="username">
+                <input type="password" id="register-password" placeholder="🔒 Пароль" required autocomplete="new-password">
+                <input type="password" id="register-password-confirm" placeholder="🔒 Подтвердите пароль" required autocomplete="new-password">
                 <button type="submit" class="btn-primary">Регистрация</button>
                 <div id="register-error" class="error-msg"></div>
             </form>
@@ -62,6 +72,10 @@
             <div class="search-bar">
                 <input type="text" id="main-search" placeholder="🔎 Поиск игроков, команд, турниров...">
                 <button onclick="performSearch()">Найти</button>
+            </div>
+            <div style="margin-top: 1.75rem; display:flex; justify-content:center; gap:1rem; flex-wrap:wrap;">
+                <a href="/create" class="btn-secondary" style="font-size:1rem; padding:0.9rem 1.5rem;">Добавить новую запись</a>
+                <span style="color: rgba(255,255,255,0.9); max-width: 680px;">Создавайте реальные записи прямо в аналитическую базу. Удобная страница добавления данных для игроков, команд, турниров, тренеров и матчей.</span>
             </div>
         </section>
 

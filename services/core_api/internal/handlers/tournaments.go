@@ -550,3 +550,46 @@ func (h *HandlerRepo) DeleteFavouriteTournament(w http.ResponseWriter, r *http.R
 		log.Printf("error in writeJSON from DeleteFavoriteTournament: %v\n", err)
 	}
 }
+
+func (h *HandlerRepo) GetAllTournaments(w http.ResponseWriter, r *http.Request) {
+	cacheKey := fmt.Sprintf("alltournaments")
+
+	ctxCache, cancelCache := context.WithTimeout(r.Context(), cacheTimeout)
+	defer cancelCache()
+	cached, err := h.cacheDB.Get(ctxCache, cacheKey)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(cached))
+		return
+	}
+
+	ctxAnalyticDB, cancelAnalyticDB := context.WithTimeout(r.Context(), dbTimeout)
+	defer cancelAnalyticDB()
+	tournaments, err := h.adb.GetAllTournaments(ctxAnalyticDB)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "favorite tournaments not found"})
+			return
+		}
+
+		h.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "try later"})
+		log.Printf("error in GetAllTournaments: %v\n", err)
+		return
+	}
+
+	resp, err := h.writeJSON(w, http.StatusOK, tournaments)
+	if err == nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+			defer cancel()
+
+			if err := h.cacheDB.Set(ctx, cacheKey, resp, cacheTTL); err != nil {
+				log.Printf("error in set to cache from GetAllTournaments: %v\n", err)
+			}
+		}()
+	} else {
+		log.Printf("error in writeJSON from GetAllTournaments: %v\n", err)
+		fmt.Printf("%+v\n", tournaments)
+	}
+}

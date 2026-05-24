@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Добавить данные - Футбольная аналитика</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Специальные стили для страницы добавления данных */
+        .create-page {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 1rem 0;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .page-header h1 {
+            font-size: 1.8rem;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .page-header p {
+            color: #6c757d;
+            margin: 0.25rem 0 0;
+        }
+
+        .create-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .create-form-section {
+            background: white;
+            border-radius: 20px;
+            padding: 1.25rem;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: box-shadow 0.2s;
+        }
+
+        .create-form-section:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .section-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-header span {
+            font-size: 0.7rem;
+            color: #6c757d;
+            background: #f8f9fa;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+        }
+
+        .field-group {
+            margin-bottom: 0.75rem;
+        }
+
+        .field-group label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.2rem;
+        }
+
+        .field-group input,
+        .field-group select {
+            width: 100%;
+            padding: 0.5rem 0.7rem;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .field-group input:focus,
+        .field-group select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52,152,219,0.1);
+        }
+
+        .nested-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .nested-card h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.85rem;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Компактные сетки для статистики */
+        .stats-grid-2cols {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.6rem;
+        }
+
+        .stats-grid-3cols {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.6rem;
+        }
+
+        .stats-grid-4cols {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.6rem;
+        }
+
+        .nested-card .field-group {
+            margin-bottom: 0;
+        }
+
+        .nested-card .field-group label {
+            font-size: 0.65rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nested-card .field-group input,
+        .nested-card .field-group select {
+            padding: 0.35rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(52,152,219,0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+
+        .helper-text {
+            font-size: 0.7rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+            padding: 0.4rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            word-break: break-all;
+        }
+
+        .helper-text.success {
+            color: #27ae60;
+            background: #d5f4e6;
+        }
+
+        .helper-text.error {
+            color: #e74c3c;
+            background: #fde2e0;
+        }
+
+        /* Адаптив */
+        @media (max-width: 1000px) {
+            .stats-grid-3cols,
+            .stats-grid-4cols {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .create-form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid-2cols,
+            .stats-grid-3cols,
+            .stats-grid-4cols {
+                grid-template-columns: 1fr;
+            }
+            
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <h2><a href="/" style="text-decoration:none; color:#2c3e50;">⚽ Футбольная аналитика</a></h2>
+            </div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Главная</a>
+                <a href="/search" class="nav-link">Поиск</a>
+                <a href="/create" class="nav-link">Добавить данные</a>
+                <div class="auth-section">
+                    <span id="user-name" style="display:none; margin-right: 15px;"></span>
+                    <button id="auth-btn" class="btn-primary" onclick="toggleAuthPanel()">Войти</button>
+                    <button id="logout-btn" class="btn-secondary" style="display:none;" onclick="logout()">Выйти</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div id="auth-panel" class="auth-panel" style="display:none;">
+        <div class="auth-container">
+            <div class="close-btn" onclick="toggleAuthPanel()">✕</div>
+            <div class="auth-tabs">
+                <button class="tab-btn active" onclick="switchTab('login', event)">Вход</button>
+                <button class="tab-btn" onclick="switchTab('register', event)">Регистрация</button>
+            </div>
+            <form id="login-form" class="tab-content active">
+                <input type="text" id="login-username" placeholder="Логин" required autocomplete="username">
+                <input type="password" id="login-password" placeholder="Пароль" required autocomplete="current-password">
+                <button type="submit" class="btn-primary">Войти</button>
+                <div id="login-error" class="error-msg"></div>
+            </form>
+            <form id="register-form" class="tab-content">
+                <input type="text" id="register-username" placeholder="Логин" required autocomplete="username">
+                <input type="password" id="register-password" placeholder="Пароль" required autocomplete="new-password">
+                <input type="password" id="register-password-confirm" placeholder="Подтвердите пароль" required autocomplete="new-password">
+                <button type="submit" class="btn-primary">Регистрация</button>
+                <div id="register-error" class="error-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <main class="create-page">
+        <div class="page-header">
+            <div>
+                <h1>📝 Добавить данные</h1>
+                <p>Создавайте новые записи: игроков, команды, турниры, тренеров, матчи и статистику</p>
+            </div>
+            <a href="/" class="btn-secondary">← Вернуться на главную</a>
+        </div>
+
+        <div class="create-form-grid">
+            <!-- Игрок -->
+            <div class="create-form-section">
+                <div class="section-header">
+                    <h3>⚽ Игрок</h3>
+                    <span>Добавление нового атлета</span>
+                </div>
+                <div class="stats-grid-2cols">
+                    <div class="field-group"><label>Имя *</label><input id="player-first" type="text" placeholder="Лионель"></div>
+                    <div class="field-group"><label>Фамилия *</label><input id="player-last" type="text" placeholder="Месси"></div>
+                    <div class="field-group"><label>Позиция</label><input id="player-pos" type="text" placeholder="F/M/D/G"></div>
+                    <div class="field-group"><label>Дата рождения</label><input id="player-dob" type="date"></div>
+                    <div class="field-group"><label>Рост (см)</label><input id="player-height" type="number" placeholder="170"></div>
+                    <div class="field-group"><label>Страна</label><input id="player-nation" type="text" placeholder="Аргентина"></div>
+                    <div class="field-group"><label>Ссылка на флаг</label><input id="player-flag" type="text" placeholder="https://..."></div>
+                    <div class="field-group"><label>Нога</label><input id="player-foot" type="text" placeholder="Правая/Левая"></div>
+                    <div class="field-group"><label>Статус</label><input id="player-status" type="text" placeholder="Active/Retired"></div>
+                    <div class="field-group"><label>Фото</label><input id="player-photo" type="text" placeholder="https://..."></div>
+                </div>
+                <button class="btn-primary" onclick="createPlayer()">➕ Добавить игрока</button>
+                <div id="player-res" class="helper-text"></div>
+            </div>
+
+            <!-- Команда -->
+            <div class="create-form-section">
+                <div class="section-header">
+                    <h3>🏆 Команда</h3>
+                    <span>Добавление новой команды</span>
+                </div>
+                <div class="field-group"><label>Название команды *</label><input id="team-name" type="text" placeholder="Барселона"></div>
+                <div class="field-group"><label>Логотип</label><input id="team-logo" type="text" placeholder="https://..."></div>
+                <button class="btn-primary" onclick="createTeam()">➕ Добавить команду</button>
+                <div id="team-res" class="helper-text"></div>
+            </div>
+
+            <!-- Турнир -->
+            <div class="create-form-section">
+                <div class="section-header">
+                    <h3>🏅 Турнир</h3>
+                    <span>Сезон в формате YYYY/YYYY</span>
+                </div>
+                <div class="stats-grid-2cols">
+                    <div class="field-group"><label>Название</label><input id="t-name" type="text" placeholder="Ла Лига"></div>
+                    <div class="field-group"><label>Страна</label><input id="t-country" type="text" placeholder="Испания"></div>
+                    <div class="field-group"><label>Флаг</label><input id="t-flag" type="text" placeholder="https://..."></div>
+                    <div class="field-group"><label>Сезон</label><input id="t-season" type="text" placeholder="2025/2026"></div>
+                    <div class="field-group" style="grid-column: span 2;"><label>Логотип</label><input id="t-logo" type="text" placeholder="https://..."></div>
+                </div>
+                <button class="btn-primary" onclick="createTournament()">➕ Добавить турнир</button>
+                <div id="t-res" class="helper-text"></div>
+            </div>
+
+            <!-- Тренер -->
+            <div class="create-form-section">
+                <div class="section-header">
+                    <h3>👨‍✈️ Тренер</h3>
+                    <span>Добавление нового менеджера</span>
+                </div>
+                <div class="stats-grid-2cols">
+                    <div class="field-group"><label>Имя</label><input id="m-first" type="text" placeholder="Хосеп"></div>
+                    <div class="field-group"><label>Фамилия</label><input id="m-last" type="text" placeholder="Гвардиола"></div>
+                    <div class="field-group"><label>Страна</label><input id="m-nation" type="text" placeholder="Испания"></div>
+                    <div class="field-group"><label>Флаг</label><input id="m-flag" type="text" placeholder="https://..."></div>
+                    <div class="field-group"><label>Фото</label><input id="m-photo" type="text" placeholder="https://..."></div>
+                    <div class="field-group"><label>ЖК</label><input id="m-yellow" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>КК</label><input id="m-red" type="number" placeholder="0"></div>
+                </div>
+                <button class="btn-primary" onclick="createManager()">➕ Добавить тренера</button>
+                <div id="m-res" class="helper-text"></div>
+            </div>
+
+            <!-- Матч -->
+            <div class="create-form-section">
+                <div class="section-header">
+                    <h3>📅 Матч</h3>
+                    <span>Базовая информация о матче</span>
+                </div>
+                <div class="stats-grid-2cols">
+                    <div class="field-group"><label>Дата *</label><input id="f-date" type="date"></div>
+                    <div class="field-group"><label>Домашняя команда ID</label><input id="f-home" type="number" placeholder="ID"></div>
+                    <div class="field-group"><label>Гостевая команда ID</label><input id="f-away" type="number" placeholder="ID"></div>
+                    <div class="field-group"><label>Турнир ID</label><input id="f-tid" type="number" placeholder="ID"></div>
+                    <div class="field-group"><label>Дом. менеджер ID</label><input id="f-home-manager" type="number" placeholder="ID"></div>
+                    <div class="field-group"><label>Гост. менеджер ID</label><input id="f-away-manager" type="number" placeholder="ID"></div>
+                    <div class="field-group"><label>Счет дома</label><input id="f-home-score" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Счет гостей</label><input id="f-away-score" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Раунд</label><input id="f-round" type="number" placeholder="1"></div>
+                    <div class="field-group"><label>Статус</label><input id="f-status" type="text" placeholder="Ended/Not started"></div>
+                </div>
+                <button class="btn-primary" onclick="createFixture()">➕ Добавить матч</button>
+                <div id="f-res" class="helper-text"></div>
+            </div>
+
+            <!-- Турнирная таблица -->
+            <div class="create-form-section">
+                <div class="section-header">
+                    <h3>📊 Турнирная таблица</h3>
+                    <span>Добавление одной строки</span>
+                </div>
+                <div class="stats-grid-2cols">
+                    <div class="field-group"><label>Турнир ID</label><input id="table-tournament-id" type="number" placeholder="ID"></div>
+                    <div class="field-group"><label>Команда ID</label><input id="table-team-id" type="number" placeholder="ID"></div>
+                    <div class="field-group"><label>Очки</label><input id="table-points" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Позиция</label><input id="table-position" type="number" placeholder="1"></div>
+                    <div class="field-group"><label>Матчи</label><input id="table-matches" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Победы</label><input id="table-wins" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Ничьи</label><input id="table-draws" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Поражения</label><input id="table-losses" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Забито</label><input id="table-goals-for" type="number" placeholder="0"></div>
+                    <div class="field-group"><label>Пропущено</label><input id="table-goals-against" type="number" placeholder="0"></div>
+                </div>
+                <button class="btn-primary" onclick="createTable()">➕ Добавить строку</button>
+                <div id="table-res" class="helper-text"></div>
+            </div>
+
+            <!-- Статистика матча -->
+            <div class="create-form-section">
+                <div class="section-header">
+                    <h3>📈 Статистика матча</h3>
+                    <span>Игроки, вратари и метрики</span>
+                </div>
+                
+                <div class="field-group"><label>ID матча *</label><input id="s-match" type="number" placeholder="ID матча" style="max-width: 150px;"></div>
+
+                <!-- Полевой игрок -->
+                <div class="nested-card">
+                    <h4>⚽ Полевой игрок</h4>
+                    <div class="stats-grid-2cols">
+                        <div class="field-group"><label>ID игрока</label><input id="s-player" type="number" placeholder="ID"></div>
+                        <div class="field-group"><label>Старт</label><select id="s-start"><option value="true">Да</option><option value="false" selected>Нет</option></select></div>
+                        <div class="field-group"><label>Рейтинг</label><input id="s-rating" type="number" step="0.1" placeholder="7.5"></div>
+                        <div class="field-group"><label>Минуты</label><input id="s-min" type="number" placeholder="90"></div>
+                        <div class="field-group"><label>Голы</label><input id="s-goals" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Ассисты</label><input id="s-assists" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Блоки</label><input id="s-blocked" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Перехваты</label><input id="s-interceptions" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Отборы</label><input id="s-tackles" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Обводки</label><input id="s-dribbled" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Дуэли</label><input id="s-duels" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Дуэли выигр.</label><input id="s-duels-won" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Фолы</label><input id="s-fouls" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Фолы на нём</label><input id="s-was-fouled" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пасы всего</label><input id="s-pass-attempts" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Точные пасы</label><input id="s-complete-passes" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Ключ. пасы</label><input id="s-key-passes" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Удары в створ</label><input id="s-shots-on-target" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Всего ударов</label><input id="s-total-shots" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Дриблинг (попытки)</label><input id="s-dribble-attempts" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Дриблинг (успех)</label><input id="s-complete-dribbles" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пенальти (забито)</label><input id="s-penalty-scored" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пенальти (мимо)</label><input id="s-penalty-missed" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Жёлтые</label><input id="s-yellow-cards" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Красные</label><input id="s-red-cards" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Капитан</label><select id="s-captain"><option value="false" selected>Нет</option><option value="true">Да</option></select></div>
+                        <div class="field-group"><label>Домашний игрок</label><select id="s-home-player"><option value="true">Да</option><option value="false" selected>Нет</option></select></div>
+                    </div>
+                </div>
+
+                <!-- Вратарь -->
+                <div class="nested-card">
+                    <h4>🧤 Вратарь</h4>
+                    <div class="stats-grid-2cols">
+                        <div class="field-group"><label>ID вратаря</label><input id="g-player" type="number" placeholder="ID"></div>
+                        <div class="field-group"><label>Старт</label><select id="g-start"><option value="true">Да</option><option value="false" selected>Нет</option></select></div>
+                        <div class="field-group"><label>Рейтинг</label><input id="g-rating" type="number" step="0.1" placeholder="7.5"></div>
+                        <div class="field-group"><label>Минуты</label><input id="g-min" type="number" placeholder="90"></div>
+                        <div class="field-group"><label>Голы</label><input id="g-goals" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Ассисты</label><input id="g-assists" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пропущено</label><input id="g-goals-conceded" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Сейвы</label><input id="g-saves" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пасы всего</label><input id="g-pass-attempts" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Точные пасы</label><input id="g-complete-passes" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Ключ. пасы</label><input id="g-key-passes" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пенальти (отбито)</label><input id="g-penalty-saved" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пенальти (пропущ)</label><input id="g-penalty-conceded" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Фолы</label><input id="g-fouls" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Фолы на нём</label><input id="g-was-fouled" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Жёлтые</label><input id="g-yellow-cards" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Красные</label><input id="g-red-cards" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Капитан</label><select id="g-captain"><option value="false" selected>Нет</option><option value="true">Да</option></select></div>
+                        <div class="field-group"><label>Домашний игрок</label><select id="g-home-player"><option value="true">Да</option><option value="false" selected>Нет</option></select></div>
+                    </div>
+                </div>
+
+                <!-- Командные метрики -->
+                <div class="nested-card">
+                    <h4>📊 Командные метрики</h4>
+                    <div class="stats-grid-3cols">
+                        <div class="field-group"><label>Уд. в створ (дом)</label><input id="t-shots-on-goal-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Уд. в створ (гости)</label><input id="t-shots-on-goal-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Всего ударов (дом)</label><input id="t-total-shots-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Всего ударов (гости)</label><input id="t-total-shots-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Заблок. ударов (дом)</label><input id="t-blocked-shots-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Заблок. ударов (гости)</label><input id="t-blocked-shots-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Фолы (дом)</label><input id="t-fouls-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Фолы (гости)</label><input id="t-fouls-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Угловые (дом)</label><input id="t-corner-kicks-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Угловые (гости)</label><input id="t-corner-kicks-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Владение % (дом)</label><input id="t-ball-possession-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Владение % (гости)</label><input id="t-ball-possession-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>ЖК (дом)</label><input id="t-yellow-cards-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>ЖК (гости)</label><input id="t-yellow-cards-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>КК (дом)</label><input id="t-red-cards-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>КК (гости)</label><input id="t-red-cards-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пасов всего (дом)</label><input id="t-total-passes-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Пасов всего (гости)</label><input id="t-total-passes-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Точных пасов (дом)</label><input id="t-complete-passes-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Точных пасов (гости)</label><input id="t-complete-passes-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Офсайды (дом)</label><input id="t-offsides-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Офсайды (гости)</label><input id="t-offsides-away" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Уд. из штрафной (дом)</label><input id="t-shots-inside-box-home" type="number" placeholder="0"></div>
+                        <div class="field-group"><label>Уд. из штрафной (гости)</label><input id="t-shots-inside-box-away" type="number" placeholder="0"></div>
+                    </div>
+                </div>
+
+                <button class="btn-primary" onclick="createStats()">➕ Добавить статистику</button>
+                <div id="s-res" class="helper-text"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Футбольная аналитика. Все права защищены.</p>
+    </footer>
+
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+    <script src="create.js"></script>
+</body>
+</html>

@@ -97,27 +97,46 @@ func (h *HandlerRepo) GetTeamStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	dateFromStr := r.URL.Query().Get("date_from")
-	dateToStr := r.URL.Query().Get("date_to")
+	dateFromStr := r.URL.Query().Get("dateFrom")
+	dateToStr := r.URL.Query().Get("dateTo")
 
-	dateFrom, _ := parseDate(dateFromStr)
-	dateTo, _ := parseDate(dateToStr)
+	var dateFrom, dateTo time.Time
+	var hasDateFrom, hasDateTo bool
 
-	if (dateFrom != time.Time{} || dateTo != time.Time{}) {
-		if !dateTo.After(dateFrom) {
-			h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid date parameters in query, date_from should be less than date_to"})
+	if dateFromStr != "" {
+		dateFrom, err = parseDate(dateFromStr)
+		if err != nil {
+			h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid date_from format, use YYYY-MM-DD"})
 			return
 		}
-		if (dateFrom != time.Time{}) {
-			filter.FromDate = dateFrom
-		} else {
-			filter.FromDate, _ = time.Parse("2006-01-02", "2014-01-01")
+		hasDateFrom = true
+	}
+
+	if dateToStr != "" {
+		dateTo, err = parseDate(dateToStr)
+		if err != nil {
+			h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid date_to format, use YYYY-MM-DD"})
+			return
 		}
-		if (dateTo != time.Time{}) {
-			filter.ToDate = dateTo
-		} else {
-			filter.ToDate = time.Now()
+		hasDateTo = true
+	}
+
+	// Валидация и установка дат
+	if hasDateFrom && hasDateTo {
+		if !dateTo.After(dateFrom) {
+			h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "date_to must be greater than date_from"})
+			return
 		}
+		filter.FromDate = dateFrom
+		filter.ToDate = dateTo
+	} else if hasDateFrom {
+		// Только date_from: от этой даты до сегодня
+		filter.FromDate = dateFrom
+		filter.ToDate = time.Now()
+	} else if hasDateTo {
+		// Только date_to: с 2014 года до этой даты
+		filter.FromDate, _ = time.Parse("2006-01-02", "2014-01-01")
+		filter.ToDate = dateTo
 	}
 
 	var getStatsFromDB func(context.Context, models.TeamStatsFilter) (models.TeamStatsInPeriod, error)
@@ -126,9 +145,11 @@ func (h *HandlerRepo) GetTeamStats(w http.ResponseWriter, r *http.Request) {
 	if filter.Season != "" {
 		getStatsFromDB = h.adb.GetTeamStatsBySeason
 		cacheKey = "team:" + fmt.Sprint(id) + ":stats:season:" + filter.Season
-	} else if (filter.ToDate != time.Time{} || filter.FromDate != time.Time{}) {
+	} else if hasDateFrom || hasDateTo { // Исправлено: проверяем наличие любого фильтра дат
 		getStatsFromDB = h.adb.GetTeamStatsByDates
-		cacheKey = "team:" + fmt.Sprint(id) + ":stats:dates:" + fmt.Sprintf("%s_%s", filter.FromDate, filter.ToDate)
+		cacheKey = "team:" + fmt.Sprint(id) + ":stats:dates:" + fmt.Sprintf("%s_%s",
+			filter.FromDate.Format("2006-01-02"),
+			filter.ToDate.Format("2006-01-02"))
 	} else {
 		getStatsFromDB = h.adb.GetTeamFullStats
 		cacheKey = "team:" + fmt.Sprint(id) + ":stats:full"
@@ -403,7 +424,18 @@ func (h *HandlerRepo) GetTeamLastGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cacheKey := fmt.Sprintf("team:%d:fixtures:limit:%d:offset:%d", id, limit, offset)
+	seasonParam := r.URL.Query().Get("season")
+	if seasonParam != "" {
+		seasonParam = validateAndFormatSeason(seasonParam)
+		if seasonParam == "" {
+			h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid season parameter in query, use YYYY/YYYY or YYYY-YYYY"})
+			return
+		}
+	} else {
+		seasonParam = getCurrentSeason()
+	}
+
+	cacheKey := fmt.Sprintf("team:%d:fixtures:limit:%d:offset:%d:season:%s", id, limit, offset, seasonParam)
 
 	ctxCache, cancelCache := context.WithTimeout(r.Context(), cacheTimeout)
 	defer cancelCache()
@@ -417,7 +449,7 @@ func (h *HandlerRepo) GetTeamLastGames(w http.ResponseWriter, r *http.Request) {
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	matches, err := h.adb.GetTeamLastGames(ctxMainDB, uint32(id), uint32(limit), uint32(offset))
+	matches, err := h.adb.GetTeamGames(ctxMainDB, uint32(id), uint32(limit), uint32(offset), seasonParam)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "team last games not found"})
@@ -672,6 +704,15 @@ func (h *HandlerRepo) SetFavouriteTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cacheKey := fmt.Sprintf("user:%d:teams", userID)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+		defer cancel()
+		if err := h.cacheDB.Del(ctx, cacheKey); err != nil {
+			log.Printf("error deleting cache for user %d: %v\n", userID, err)
+		}
+	}()
+
 	_, err = h.writeJSON(w, http.StatusCreated, nil)
 	if err != nil {
 		log.Printf("error in writeJSON from SetFavoriteTeam: %v\n", err)
@@ -721,6 +762,15 @@ func (h *HandlerRepo) DeleteFavouriteTeam(w http.ResponseWriter, r *http.Request
 		log.Printf("error in DeleteFavoriteTeamByID: %v\n", err)
 		return
 	}
+
+	cacheKey := fmt.Sprintf("user:%d:teams", userID)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+		defer cancel()
+		if err := h.cacheDB.Del(ctx, cacheKey); err != nil {
+			log.Printf("error deleting cache for user %d: %v\n", userID, err)
+		}
+	}()
 
 	_, err = h.writeJSON(w, http.StatusOK, nil)
 	if err != nil {

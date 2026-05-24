@@ -479,3 +479,15 @@ type ManagerMatch struct {
 	Status     string     `json:"status"`
 	Tournament Tournament `json:"tournament"`
 }
+
+type TeamSeason struct {
+	ID      uint32 `json:"team_id"`
+	Name    string `json:"name,omitempty"`
+	URLLogo string `json:"url_logo,omitempty"`
+	Season  string `json:"season,omitempty"`
+}
+
+type ManagerTeams struct {
+	Season string `json:"season"`
+	Teams  Team   `json:"team"`
+}

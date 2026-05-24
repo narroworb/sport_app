@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
-	"github.com/narroworb/core_api/internal/models"
-
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+
+	"github.com/narroworb/core_api/internal/models"
 )
 
 type ClichouseDB struct {
@@ -98,10 +98,10 @@ func (c *ClichouseDB) GetTeamByID(ctx context.Context, id uint32) (models.Team, 
 }
 
 func (c *ClichouseDB) GetMatchByID(ctx context.Context, id uint32) (models.Match, error) {
-	row := c.conn.QueryRow(ctx, "SELECT tournament_id, date, home_team_id, away_team_id, home_score, away_score, round, home_team_manager_id, away_team_manager_id, status FROM Matches WHERE match_id=$1", id)
+	row := c.conn.QueryRow(ctx, "SELECT Matches.tournament_id, date, home_team_id, away_team_id, home_score, away_score, round, home_team_manager_id, away_team_manager_id, status, logo_url FROM Matches INNER JOIN Tournaments ON Matches.tournament_id = Tournaments.tournament_id INNER JOIN Tournament_Logos ON Tournaments.name = Tournament_Logos.tournament_name  WHERE match_id=$1", id)
 
 	var match models.Match
-	if err := row.Scan(&match.Tournament.ID, &match.Date, &match.HomeTeam.ID, &match.AwayTeam.ID, &match.HomeGoals, &match.AwayGoals, &match.Round, &match.HomeManager.ID, &match.AwayManager.ID, &match.Status); err != nil {
+	if err := row.Scan(&match.Tournament.ID, &match.Date, &match.HomeTeam.ID, &match.AwayTeam.ID, &match.HomeGoals, &match.AwayGoals, &match.Round, &match.HomeManager.ID, &match.AwayManager.ID, &match.Status, &match.Tournament.URLLogo); err != nil {
 		return models.Match{}, err
 	}
 	match.ID = id
@@ -370,157 +370,115 @@ func (c *ClichouseDB) GetGoalieFullStats(ctx context.Context, filter models.Play
 	return stats, nil
 }
 
-func (c *ClichouseDB) GetPlayerFixtures(ctx context.Context, id, limit, offset uint32) ([]models.PlayerMatch, error) {
+func (c *ClichouseDB) GetPlayerFixtures(ctx context.Context, id, limit, offset uint32, season string) ([]models.PlayerMatch, error) {
+	baseQuery := `
+    SELECT 
+        s.match_id,
+        date,
+        home_team_id,
+        ht.name,
+        htl.logo_url,
+        away_team_id,
+        at.name,
+        atl.logo_url,
+        home_score,
+        away_score,
+        round,
+        status,
+        m.tournament_id,
+        t.name,
+        goals,
+        assists,
+        red_cards,
+        toFloat64(rating) as rating,
+        minutes_played
+    FROM Football_Player_Match_Stats s 
+    INNER JOIN Matches m ON s.match_id=m.match_id 
+    INNER JOIN Teams ht ON m.home_team_id=ht.team_id
+    INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
+    INNER JOIN Teams at ON m.away_team_id=at.team_id
+    INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
+    INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
+    WHERE athlete_id=$1 and season = $2
+    
+    UNION ALL
+    
+    SELECT 
+        s.match_id,
+        date,
+        home_team_id,
+        ht.name,
+        htl.logo_url,
+        away_team_id,
+        at.name,
+        atl.logo_url,
+        home_score,
+        away_score,
+        round,
+        status,
+        m.tournament_id,
+        t.name,
+        goals,
+        assists,
+        red_cards,
+        toFloat64(rating) as rating,
+        minutes_played
+    FROM Football_Goalie_Match_Stats s 
+    INNER JOIN Matches m ON s.match_id=m.match_id 
+    INNER JOIN Teams ht ON m.home_team_id=ht.team_id
+    INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
+    INNER JOIN Teams at ON m.away_team_id=at.team_id
+    INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
+    INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
+    WHERE athlete_id=$1 and season = $2
+    `
+
 	var rows driver.Rows
 	var err error
+
+	// Оборачиваем в подзапрос для правильной пагинации
 	if limit > 0 {
 		rows, err = c.conn.Query(ctx, `
-	SELECT 
-		s.match_id,
-		date,
-		home_team_id,
-		ht.name,
-		htl.logo_url,
-		away_team_id,
-		at.name,
-		atl.logo_url,
-		home_score,
-		away_score,
-		round,
-		status,
-		m.tournament_id,
-		t.name,
-		goals,
-		assists,
-		red_cards,
-		toFloat64(rating) as rating,
-		minutes_played
-		FROM Football_Player_Match_Stats s 
-	INNER JOIN Matches m ON s.match_id=m.match_id 
-	INNER JOIN Teams ht ON m.home_team_id=ht.team_id
-	INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
-	INNER JOIN Teams at ON m.away_team_id=at.team_id
-	INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
-	INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
-	WHERE athlete_id=$1
-	UNION ALL
-	SELECT 
-		s.match_id,
-		date,
-		home_team_id,
-		ht.name,
-		htl.logo_url,
-		away_team_id,
-		at.name,
-		atl.logo_url,
-		home_score,
-		away_score,
-		round,
-		status,
-		m.tournament_id,
-		t.name,
-		goals,
-		assists,
-		red_cards,
-		toFloat64(rating) as rating,
-		minutes_played
-		FROM Football_Goalie_Match_Stats s 
-	INNER JOIN Matches m ON s.match_id=m.match_id 
-	INNER JOIN Teams ht ON m.home_team_id=ht.team_id
-	INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
-	INNER JOIN Teams at ON m.away_team_id=at.team_id
-	INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
-	INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
-	WHERE athlete_id=$1
-	ORDER BY m.date DESC
-	LIMIT $2
-	OFFSET $3`,
-			id, limit, offset)
+            SELECT * FROM (
+                `+baseQuery+`
+            ) AS combined
+            ORDER BY date DESC
+            LIMIT $3 OFFSET $4
+        `, id, season, limit, offset)
 	} else {
 		rows, err = c.conn.Query(ctx, `
-	SELECT 
-		s.match_id,
-		date,
-		home_team_id,
-		ht.name,
-		htl.logo_url,
-		away_team_id,
-		at.name,
-		atl.logo_url,
-		home_score,
-		away_score,
-		round,
-		status,
-		m.tournament_id,
-		t.name,
-		goals,
-		assists,
-		red_cards,
-		toFloat64(rating) as rating,
-		minutes_played
-		FROM Football_Player_Match_Stats s 
-	INNER JOIN Matches m ON s.match_id=m.match_id 
-	INNER JOIN Teams ht ON m.home_team_id=ht.team_id
-	INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
-	INNER JOIN Teams at ON m.away_team_id=at.team_id
-	INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
-	INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
-	WHERE athlete_id=$1
-	UNION ALL
-	SELECT 
-		s.match_id,
-		date,
-		home_team_id,
-		ht.name,
-		htl.logo_url,
-		away_team_id,
-		at.name,
-		atl.logo_url,
-		home_score,
-		away_score,
-		round,
-		status,
-		m.tournament_id,
-		t.name,
-		goals,
-		assists,
-		red_cards,
-		toFloat64(rating) as rating,
-		minutes_played
-		FROM Football_Goalie_Match_Stats s 
-	INNER JOIN Matches m ON s.match_id=m.match_id 
-	INNER JOIN Teams ht ON m.home_team_id=ht.team_id
-	INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
-	INNER JOIN Teams at ON m.away_team_id=at.team_id
-	INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
-	INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
-	WHERE athlete_id=$1
-	ORDER BY m.date DESC`, id)
+            SELECT * FROM (
+                `+baseQuery+`
+            ) AS combined
+            ORDER BY date DESC
+        `, id, season)
 		limit = 100
 	}
 
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	matches := make([]models.PlayerMatch, 0, limit)
 
 	for rows.Next() {
 		var match models.PlayerMatch
-		if err := rows.Scan(&match.ID, &match.Date, &match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo,
-			&match.HomeGoals, &match.AwayGoals, &match.Round, &match.Status, &match.Tournament.ID, &match.Tournament.Name, &match.PlayerGoals, &match.PlayerAssists,
+		if err := rows.Scan(&match.ID, &match.Date, &match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo,
+			&match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo,
+			&match.HomeGoals, &match.AwayGoals, &match.Round, &match.Status,
+			&match.Tournament.ID, &match.Tournament.Name, &match.PlayerGoals, &match.PlayerAssists,
 			&match.PlayerRedCards, &match.PlayerRating, &match.PlayerMinutesPlayed); err != nil {
 			return nil, err
 		}
 		match.PlayerID = id
-
 		matches = append(matches, match)
 	}
 
 	return matches, nil
 }
 
-func (c *ClichouseDB) GetPlayerTeams(ctx context.Context, id uint32) ([]models.Team, error) {
+func (c *ClichouseDB) GetPlayerTeams(ctx context.Context, id uint32) ([]models.TeamSeason, error) {
 	rows, err := c.conn.Query(ctx, `
 	WITH last_match AS 
 	(SELECT f.athlete_id, first_name, last_name, nation, home_team_player, f.match_id AS match_id FROM Football_Player_Match_Stats AS f 
@@ -533,27 +491,29 @@ func (c *ClichouseDB) GetPlayerTeams(ctx context.Context, id uint32) ([]models.T
 	INNER JOIN Athletes AS a ON a.athlete_id=f.athlete_id 
 	WHERE f.athlete_id = $1 
 	ORDER BY f.match_id DESC) 
-	SELECT t.team_id, name, logo_url FROM Matches
-	INNER JOIN last_match ON last_match.match_id=Matches.match_id 
+	SELECT t.team_id, t.name, logo_url, tr.season FROM Matches m
+	INNER JOIN last_match ON last_match.match_id=m.match_id 
 	INNER JOIN Teams t ON t.team_id=home_team_id
 	INNER JOIN Team_Logos tl ON t.team_id=tl.team_id
+	INNER JOIN Tournaments tr ON tr.tournament_id=m.tournament_id
 	WHERE home_team_player
 	UNION DISTINCT
-	SELECT t.team_id, name, logo_url FROM Matches
-	INNER JOIN last_match ON last_match.match_id=Matches.match_id 
+	SELECT t.team_id, t.name, logo_url, tr.season FROM Matches m
+	INNER JOIN last_match ON last_match.match_id=m.match_id 
 	INNER JOIN Teams t ON t.team_id=away_team_id
 	INNER JOIN Team_Logos tl ON t.team_id=tl.team_id
+	INNER JOIN Tournaments tr ON tr.tournament_id=m.tournament_id
 	WHERE home_team_player=0;`,
 		id)
 	if err != nil {
 		return nil, err
 	}
 
-	teams := make([]models.Team, 0, 5)
+	teams := make([]models.TeamSeason, 0, 5)
 
 	for rows.Next() {
-		var team models.Team
-		if err := rows.Scan(&team.ID, &team.Name, &team.URLLogo); err != nil {
+		var team models.TeamSeason
+		if err := rows.Scan(&team.ID, &team.Name, &team.URLLogo, &team.Season); err != nil {
 			return nil, err
 		}
 
@@ -689,8 +649,8 @@ func (c *ClichouseDB) GetTeamStatsBySeason(ctx context.Context, filter models.Te
 	AVG(complete_passes),
 	SUM(complete_passes_conceded),
 	AVG(complete_passes_conceded),
-	AVG(complete_passes/total_passes),
-	AVG(complete_passes_conceded/total_passes_conceded),
+	if(isNaN(AVG(complete_passes/total_passes)), 0, AVG(complete_passes/total_passes)),
+	if(isNaN(AVG(complete_passes_conceded/total_passes_conceded)), 0, AVG(complete_passes_conceded/total_passes_conceded)),
 	SUM(offsides),
 	AVG(offsides),
 	SUM(offsides_conceded),
@@ -838,8 +798,8 @@ func (c *ClichouseDB) GetTeamStatsByDates(ctx context.Context, filter models.Tea
 	AVG(complete_passes),
 	SUM(complete_passes_conceded),
 	AVG(complete_passes_conceded),
-	AVG(complete_passes/total_passes),
-	AVG(complete_passes_conceded/total_passes_conceded),
+	if(isNaN(AVG(complete_passes/total_passes)), 0, AVG(complete_passes/total_passes)),
+	if(isNaN(AVG(complete_passes_conceded/total_passes_conceded)), 0, AVG(complete_passes_conceded/total_passes_conceded)),
 	SUM(offsides),
 	AVG(offsides),
 	SUM(offsides_conceded),
@@ -987,8 +947,8 @@ func (c *ClichouseDB) GetTeamFullStats(ctx context.Context, filter models.TeamSt
 	AVG(complete_passes),
 	SUM(complete_passes_conceded),
 	AVG(complete_passes_conceded),
-	AVG(complete_passes/total_passes),
-	AVG(complete_passes_conceded/total_passes_conceded),
+	if(isNaN(AVG(complete_passes/total_passes)), 0, AVG(complete_passes/total_passes)),
+	if(isNaN(AVG(complete_passes_conceded/total_passes_conceded)), 0, AVG(complete_passes_conceded/total_passes_conceded)),
 	SUM(offsides),
 	AVG(offsides),
 	SUM(offsides_conceded),
@@ -1048,7 +1008,7 @@ func (c *ClichouseDB) GetStandingsByTeamAndSeason(ctx context.Context, teamID ui
 
 func (c *ClichouseDB) GetTeamNextGame(ctx context.Context, id uint32) (models.ShortMatch, error) {
 	row := c.conn.QueryRow(ctx, `SELECT 
-	ht.team_id, ht.name, htl.logo_url, at.team_id, at.name, atl.logo_url, date, round, t.name, tl.logo_url FROM Matches m
+	m.match_id, ht.team_id, ht.name, htl.logo_url, at.team_id, at.name, atl.logo_url, date, round, t.name, tl.logo_url FROM Matches m
 	INNER JOIN Teams ht ON ht.team_id=m.home_team_id
 	INNER JOIN Team_Logos htl ON ht.team_id=htl.team_id
 	INNER JOIN Teams at ON at.team_id=m.away_team_id
@@ -1061,10 +1021,9 @@ func (c *ClichouseDB) GetTeamNextGame(ctx context.Context, id uint32) (models.Sh
 	`, id)
 
 	var match models.ShortMatch
-	if err := row.Scan(&match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo, &match.Date, &match.Round, &match.Tournament.Name, &match.Tournament.URLLogo); err != nil {
+	if err := row.Scan(&match.ID, &match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo, &match.Date, &match.Round, &match.Tournament.Name, &match.Tournament.URLLogo); err != nil {
 		return models.ShortMatch{}, err
 	}
-	match.ID = id
 
 	return match, nil
 }
@@ -1112,21 +1071,21 @@ func (c *ClichouseDB) GetTeamPlayersBySeason(ctx context.Context, teamID uint32,
 	return squad, nil
 }
 
-func (c *ClichouseDB) GetTeamLastGames(ctx context.Context, teamID uint32, limit, offset uint32) ([]models.ShortMatch, error) {
+func (c *ClichouseDB) GetTeamGames(ctx context.Context, teamID uint32, limit, offset uint32, season string) ([]models.ShortMatch, error) {
 	rows, err := c.conn.Query(ctx, `
 	SELECT 
-	match_id, ht.team_id, ht.name, htl.logo_url, at.team_id, at.name, atl.logo_url, date, round, t.name, tl.logo_url, status FROM Matches m
+	match_id, ht.team_id, ht.name, htl.logo_url, at.team_id, at.name, atl.logo_url, home_score, away_score, date, round, t.name, tl.logo_url, status FROM Matches m
 	INNER JOIN Teams ht ON ht.team_id=m.home_team_id
 	INNER JOIN Team_Logos htl ON ht.team_id=htl.team_id
 	INNER JOIN Teams at ON at.team_id=m.away_team_id
 	INNER JOIN Team_Logos atl ON at.team_id=atl.team_id
 	INNER JOIN Tournaments t ON t.tournament_id=m.tournament_id
 	INNER JOIN Tournament_Logos tl ON t.name=tl.tournament_name
-	WHERE (home_team_id = $1 OR away_team_id = $1) AND date <= now()
+	WHERE (home_team_id = $1 OR away_team_id = $1) and t.season=$2
 	ORDER BY date DESC
-	LIMIT $2
-	OFFSET $3`,
-		teamID, limit, offset)
+	LIMIT $3
+	OFFSET $4`,
+		teamID, season, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -1135,7 +1094,7 @@ func (c *ClichouseDB) GetTeamLastGames(ctx context.Context, teamID uint32, limit
 
 	for rows.Next() {
 		var match models.ShortMatch
-		if err := rows.Scan(&match.ID, &match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo, &match.Date, &match.Round, &match.Tournament.Name, &match.Tournament.URLLogo, &match.Status); err != nil {
+		if err := rows.Scan(&match.ID, &match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo, &match.HomeGoals, &match.AwayGoals, &match.Date, &match.Round, &match.Tournament.Name, &match.Tournament.URLLogo, &match.Status); err != nil {
 			return nil, err
 		}
 
@@ -1699,8 +1658,8 @@ func (c *ClichouseDB) GetManagerStatsBySeason(ctx context.Context, id uint32) (m
 	AVG(complete_passes),
 	SUM(complete_passes_conceded),
 	AVG(complete_passes_conceded),
-	AVG(complete_passes/total_passes),
-	AVG(complete_passes_conceded/total_passes_conceded),
+	if(isNaN(AVG(complete_passes/total_passes)), 0, AVG(complete_passes/total_passes)),
+	if(isNaN(AVG(complete_passes_conceded/total_passes_conceded)), 0, AVG(complete_passes_conceded/total_passes_conceded)),
 	SUM(offsides),
 	AVG(offsides),
 	SUM(offsides_conceded),
@@ -1847,8 +1806,8 @@ func (c *ClichouseDB) GetManagerStatsByTeam(ctx context.Context, id uint32) (map
 	AVG(complete_passes),
 	SUM(complete_passes_conceded),
 	AVG(complete_passes_conceded),
-	AVG(complete_passes/total_passes),
-	AVG(complete_passes_conceded/total_passes_conceded),
+	if(isNaN(AVG(complete_passes/total_passes)), 0, AVG(complete_passes/total_passes)),
+	if(isNaN(AVG(complete_passes_conceded/total_passes_conceded)), 0, AVG(complete_passes_conceded/total_passes_conceded)),
 	SUM(offsides),
 	AVG(offsides),
 	SUM(offsides_conceded),
@@ -1990,8 +1949,8 @@ func (c *ClichouseDB) GetManagerFullStats(ctx context.Context, id uint32) (map[s
 	AVG(complete_passes),
 	SUM(complete_passes_conceded),
 	AVG(complete_passes_conceded),
-	AVG(complete_passes/total_passes),
-	AVG(complete_passes_conceded/total_passes_conceded),
+	if(isNaN(AVG(complete_passes/total_passes)), 0, AVG(complete_passes/total_passes)),
+	if(isNaN(AVG(complete_passes_conceded/total_passes_conceded)), 0, AVG(complete_passes_conceded/total_passes_conceded)),
 	SUM(offsides),
 	AVG(offsides),
 	SUM(offsides_conceded),
@@ -2027,7 +1986,7 @@ func (c *ClichouseDB) GetManagerCardsByID(ctx context.Context, id uint32) (uint1
 	return yellow, red, nil
 }
 
-func (c *ClichouseDB) GetManagerTeams(ctx context.Context, id uint32) (map[string][]string, error) {
+func (c *ClichouseDB) GetManagerTeams(ctx context.Context, id uint32) ([]models.ManagerTeams, error) {
 	rows, err := c.conn.Query(ctx, `
 	WITH all_teams_seasons AS (
 		SELECT DISTINCT 
@@ -2048,106 +2007,113 @@ func (c *ClichouseDB) GetManagerTeams(ctx context.Context, id uint32) (map[strin
 	)
 	SELECT DISTINCT
 	season,
-	name
+	t.team_id,
+	name,
+	logo_url
 	FROM all_teams_seasons a
 	INNER JOIN Teams t ON t.team_id=a.team_id
+	INNER JOIN Team_Logos tl ON tl.team_id=a.team_id
 	ORDER BY name, season`,
 		id)
 	if err != nil {
 		return nil, err
 	}
 
-	allTeams := make(map[string][]string)
+	allTeams := make([]models.ManagerTeams, 0, 10)
 
 	for rows.Next() {
-		var season, team string
+		var season, team, logoURL string
+		var teamID uint32
 
-		if err := rows.Scan(&season, &team); err != nil {
+		if err := rows.Scan(&season, &teamID, &team, &logoURL); err != nil {
 			return nil, err
 		}
-
-		if len(allTeams[team]) == 0 {
-			allTeams[team] = make([]string, 0, 4)
-		}
-		allTeams[team] = append(allTeams[team], season)
+		allTeams = append(allTeams, models.ManagerTeams{
+			Season: season,
+			Teams:  models.Team{Name: team, URLLogo: logoURL, ID: teamID},
+		})
 	}
 
 	return allTeams, nil
 }
 
-func (c *ClichouseDB) GetManagerFixtures(ctx context.Context, id, limit, offset uint32) ([]models.ManagerMatch, error) {
+func (c *ClichouseDB) GetManagerFixtures(ctx context.Context, id, limit, offset uint32, season string) ([]models.ManagerMatch, error) {
+	// Базовый запрос без ORDER BY и LIMIT/OFFSET
+	baseQuery := `
+    SELECT 
+        m.match_id,
+        date,
+        home_team_id,
+        ht.name,
+        htl.logo_url,
+        away_team_id,
+        at.name,
+        atl.logo_url,
+        home_score,
+        away_score,
+        round,
+        status,
+        t.tournament_id,
+        t.name
+    FROM Matches m 
+    INNER JOIN Teams ht ON m.home_team_id = ht.team_id
+    INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
+    INNER JOIN Teams at ON m.away_team_id = at.team_id
+    INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
+    INNER JOIN Tournaments t ON m.tournament_id = t.tournament_id
+    WHERE (home_team_manager_id = $1 OR away_team_manager_id = $1) AND t.season = $2
+    `
+
 	var rows driver.Rows
 	var err error
+
 	if limit > 0 {
+		// Оборачиваем в подзапрос для правильной пагинации
 		rows, err = c.conn.Query(ctx, `
-	SELECT 
-		m.match_id,
-		date,
-		home_team_id,
-		ht.name,
-		htl.logo_url,
-		away_team_id,
-		at.name,
-		atl.logo_url,
-		home_score,
-		away_score,
-		round,
-		status,
-		t.tournament_id,
-		t.name
-		FROM Matches m 
-	INNER JOIN Teams ht ON m.home_team_id=ht.team_id
-	INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
-	INNER JOIN Teams at ON m.away_team_id=at.team_id
-	INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
-	INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
-	WHERE home_team_manager_id=$1 OR away_team_manager_id=$1
-	ORDER BY m.date DESC
-	LIMIT $2
-	OFFSET $3`,
-			id, limit, offset)
+            SELECT * FROM (
+                `+baseQuery+`
+            ) AS combined
+            ORDER BY date DESC
+            LIMIT $3 OFFSET $4
+        `, id, season, limit, offset)
 	} else {
 		rows, err = c.conn.Query(ctx, `
-	SELECT 
-		m.match_id,
-		date,
-		home_team_id,
-		ht.name,
-		htl.logo_url,
-		away_team_id,
-		at.name,
-		atl.logo_url,
-		home_score,
-		away_score,
-		round,
-		status,
-		t.tournament_id,
-		t.name
-		FROM Matches m 
-	INNER JOIN Teams ht ON m.home_team_id=ht.team_id
-	INNER JOIN Team_Logos htl ON m.home_team_id = htl.team_id
-	INNER JOIN Teams at ON m.away_team_id=at.team_id
-	INNER JOIN Team_Logos atl ON m.away_team_id = atl.team_id
-	INNER JOIN Tournaments t ON m.tournament_id=t.tournament_id
-	WHERE home_team_manager_id=$1 OR away_team_manager_id=$1
-	ORDER BY m.date DESC`, id)
+            SELECT * FROM (
+                `+baseQuery+`
+            ) AS combined
+            ORDER BY date DESC
+        `, id, season)
 		limit = 100
 	}
 
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	matches := make([]models.ManagerMatch, 0, limit)
 
 	for rows.Next() {
 		var match models.ManagerMatch
-		if err := rows.Scan(&match.ID, &match.Date, &match.HomeTeam.ID, &match.HomeTeam.Name, &match.HomeTeam.URLLogo, &match.AwayTeam.ID, &match.AwayTeam.Name, &match.AwayTeam.URLLogo,
-			&match.HomeGoals, &match.AwayGoals, &match.Round, &match.Status, &match.Tournament.ID, &match.Tournament.Name); err != nil {
+		if err := rows.Scan(
+			&match.ID,
+			&match.Date,
+			&match.HomeTeam.ID,
+			&match.HomeTeam.Name,
+			&match.HomeTeam.URLLogo,
+			&match.AwayTeam.ID,
+			&match.AwayTeam.Name,
+			&match.AwayTeam.URLLogo,
+			&match.HomeGoals,
+			&match.AwayGoals,
+			&match.Round,
+			&match.Status,
+			&match.Tournament.ID,
+			&match.Tournament.Name,
+		); err != nil {
 			return nil, err
 		}
 		match.ManagerID = id
-
 		matches = append(matches, match)
 	}
 

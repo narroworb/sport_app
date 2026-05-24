@@ -39,3 +39,7 @@ func (r *Redis) Get(ctx context.Context, key string) (string, error) {
 func (r *Redis) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	return r.db.Set(ctx, key, value, ttl).Err()
 }
+
+func (r *Redis) Del(ctx context.Context, key string) error {
+	return r.db.Del(ctx, key).Err()
+}

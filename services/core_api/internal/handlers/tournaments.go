@@ -477,6 +477,15 @@ func (h *HandlerRepo) SetFavouriteTournament(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	cacheKey := fmt.Sprintf("user:%d:tournaments", userID)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+		defer cancel()
+		if err := h.cacheDB.Del(ctx, cacheKey); err != nil {
+			log.Printf("error deleting cache for user %d: %v\n", userID, err)
+		}
+	}()
+
 	_, err = h.writeJSON(w, http.StatusCreated, nil)
 	if err != nil {
 		log.Printf("error in writeJSON from SetFavoriteTournament: %v\n", err)
@@ -526,6 +535,15 @@ func (h *HandlerRepo) DeleteFavouriteTournament(w http.ResponseWriter, r *http.R
 		log.Printf("error in DeleteFavoriteTournamentByID: %v\n", err)
 		return
 	}
+
+	cacheKey := fmt.Sprintf("user:%d:tournaments", userID)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+		defer cancel()
+		if err := h.cacheDB.Del(ctx, cacheKey); err != nil {
+			log.Printf("error deleting cache for user %d: %v\n", userID, err)
+		}
+	}()
 
 	_, err = h.writeJSON(w, http.StatusCreated, nil)
 	if err != nil {

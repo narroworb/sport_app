@@ -20,15 +20,15 @@ type AnalyticDatabaseInterface interface {
 	GetGoalieFullStats(ctx context.Context, filter models.PlayerStatsFilter) (models.PlayerStatsInPeriod, error)
 	GetGoalieStatsBySeason(ctx context.Context, filter models.PlayerStatsFilter) (models.PlayerStatsInPeriod, error)
 	GetGoalieStatsByDates(ctx context.Context, filter models.PlayerStatsFilter) (models.PlayerStatsInPeriod, error)
-	GetPlayerFixtures(ctx context.Context, id, limit, offset uint32) ([]models.PlayerMatch, error)
-	GetPlayerTeams(ctx context.Context, id uint32) ([]models.Team, error)
+	GetPlayerFixtures(ctx context.Context, id, limit, offset uint32, season string) ([]models.PlayerMatch, error)
+	GetPlayerTeams(ctx context.Context, id uint32) ([]models.TeamSeason, error)
 	GetTeamStatsBySeason(ctx context.Context, filter models.TeamStatsFilter) (models.TeamStatsInPeriod, error)
 	GetTeamStatsByDates(ctx context.Context, filter models.TeamStatsFilter) (models.TeamStatsInPeriod, error)
 	GetTeamFullStats(ctx context.Context, filter models.TeamStatsFilter) (models.TeamStatsInPeriod, error)
 	GetStandingsByTeamAndSeason(ctx context.Context, teamID uint32, season string) ([]models.TableRow, error)
 	GetTeamNextGame(ctx context.Context, id uint32) (models.ShortMatch, error)
 	GetTeamPlayersBySeason(ctx context.Context, teamID uint32, season string) (map[string][]models.Player, error)
-	GetTeamLastGames(ctx context.Context, teamID uint32, limit, offset uint32) ([]models.ShortMatch, error)
+	GetTeamGames(ctx context.Context, teamID uint32, limit, offset uint32, season string) ([]models.ShortMatch, error)
 	GetCurrentManagerByTeam(ctx context.Context, id uint32) (models.Manager, error)
 	GetTeamPlayersWithStatsBySeason(ctx context.Context, teamID uint32, season string) (map[string][]models.PlayerWithStats, error)
 	GetTournamentTableByID(ctx context.Context, tournamentID uint32) ([]models.TableRow, error)
@@ -40,8 +40,8 @@ type AnalyticDatabaseInterface interface {
 	GetManagerStatsBySeason(ctx context.Context, id uint32) (map[string]models.ManagerStatsInPeriod, error)
 	GetManagerStatsByTeam(ctx context.Context, id uint32) (map[string]models.ManagerStatsInPeriod, error)
 	GetManagerCardsByID(ctx context.Context, id uint32) (uint16, uint16, error)
-	GetManagerTeams(ctx context.Context, id uint32) (map[string][]string, error)
-	GetManagerFixtures(ctx context.Context, id, limit, offset uint32) ([]models.ManagerMatch, error)
+	GetManagerTeams(ctx context.Context, id uint32) ([]models.ManagerTeams, error)
+	GetManagerFixtures(ctx context.Context, id, limit, offset uint32, season string) ([]models.ManagerMatch, error)
 	GetMatchesByDate(ctx context.Context, date time.Time) ([]models.Match, error)
 	GetMatchPlayersStats(ctx context.Context, id uint32) (map[string][]models.PlayerStatsInMatch, error)
 	GetMatchGoaliesStats(ctx context.Context, id uint32) (map[string][]models.GoalieStatsInMatch, error)
@@ -60,6 +60,7 @@ type AnalyticDatabaseInterface interface {
 type CacheInterface interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+	Del(ctx context.Context, key string) error
 }
 
 type TransactionDatabaseInterface interface {

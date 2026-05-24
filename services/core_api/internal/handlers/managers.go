@@ -266,7 +266,18 @@ func (h *HandlerRepo) GetManagerFixtures(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	cacheKey := fmt.Sprintf("manager:%d:fixtures:limit:%d:offset:%d", id, limit, offset)
+	seasonParam := r.URL.Query().Get("season")
+	if seasonParam != "" {
+		seasonParam = validateAndFormatSeason(seasonParam)
+		if seasonParam == "" {
+			h.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid season parameter in query, use YYYY/YYYY or YYYY-YYYY"})
+			return
+		}
+	} else {
+		seasonParam = getCurrentSeason()
+	}
+
+	cacheKey := fmt.Sprintf("manager:%d:fixtures:limit:%d:offset:%d:season:%s", id, limit, offset, seasonParam)
 
 	ctxCache, cancelCache := context.WithTimeout(r.Context(), cacheTimeout)
 	defer cancelCache()
@@ -280,7 +291,7 @@ func (h *HandlerRepo) GetManagerFixtures(w http.ResponseWriter, r *http.Request)
 
 	ctxMainDB, cancelMainDB := context.WithTimeout(r.Context(), dbTimeout)
 	defer cancelMainDB()
-	managerFixtures, err := h.adb.GetManagerFixtures(ctxMainDB, uint32(id), uint32(limit), uint32(offset))
+	managerFixtures, err := h.adb.GetManagerFixtures(ctxMainDB, uint32(id), uint32(limit), uint32(offset), seasonParam)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			h.writeJSON(w, http.StatusNotFound, map[string]string{"error": "manager fixtures not found"})
@@ -412,6 +423,15 @@ func (h *HandlerRepo) SetFavouriteManager(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	cacheKey := fmt.Sprintf("user:%d:managers", userID)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+		defer cancel()
+		if err := h.cacheDB.Del(ctx, cacheKey); err != nil {
+			log.Printf("error deleting cache for user %d: %v\n", userID, err)
+		}
+	}()
+
 	_, err = h.writeJSON(w, http.StatusCreated, nil)
 	if err != nil {
 		log.Printf("error in writeJSON from SetFavoriteManager: %v\n", err)
@@ -461,6 +481,15 @@ func (h *HandlerRepo) DeleteFavouriteManager(w http.ResponseWriter, r *http.Requ
 		log.Printf("error in DeleteFavoriteManagerByID: %v\n", err)
 		return
 	}
+
+	cacheKey := fmt.Sprintf("user:%d:managers", userID)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cacheTimeout)
+		defer cancel()
+		if err := h.cacheDB.Del(ctx, cacheKey); err != nil {
+			log.Printf("error deleting cache for user %d: %v\n", userID, err)
+		}
+	}()
 
 	_, err = h.writeJSON(w, http.StatusOK, nil)
 	if err != nil {

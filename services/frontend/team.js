@@ -70,16 +70,30 @@ function generateSeasonsList() {
     return seasons;
 }
 
-// Функция загрузки матчей с пагинацией
-async function loadFixturesWithPagination(page = 1, append = false) {
+// Функция загрузки матчей с пагинацией и сезоном
+async function loadFixturesWithPagination(page = 1, append = false, season = null) {
     if (!teamId || isLoadingFixtures) return;
     
     isLoadingFixtures = true;
     const offset = (page - 1) * fixturesLimit + 1;
     
     try {
-        // Используем teamAPI.getFixtures с параметрами
-        const fixtures = await teamAPI.getFixtures(teamId, fixturesLimit, offset);
+        // Формируем URL с параметрами
+        let url = `/api/team/${teamId}/fixtures?limit=${fixturesLimit}&offset=${offset}`;
+        
+        // Добавляем season только если он передан (не null и не пустая строка)
+        if (season && season !== '') {
+            url += `&season=${encodeURIComponent(season)}`;
+        }
+        
+        console.log('Загрузка матчей из:', url);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки матчей');
+        }
+        
+        const fixtures = await response.json();
         console.log('Матчи загружены:', fixtures);
         
         if (!fixtures || !Array.isArray(fixtures)) {
@@ -112,6 +126,8 @@ function renderFixturesList(fixtures, append = false) {
     let html = '';
     if (append && list.innerHTML !== '<p>Матчи недоступны</p>') {
         html = list.innerHTML;
+        // Удаляем старую кнопку "Показать ещё" из HTML, если она есть
+        html = html.replace(/<div id="load-more-fixtures-container"[\s\S]*?<\/div>/, '');
     }
     
     if (!fixtures || fixtures.length === 0) {
@@ -171,21 +187,90 @@ function renderFixturesList(fixtures, append = false) {
         `;
     }).join('');
     
-    const currentCount = fixturesCurrentPage * fixturesLimit;
-    if (currentCount + fixturesLimit < fixturesTotalCount && !append) {
+    // Проверяем, нужно ли показывать кнопку
+    // Вычисляем сколько всего загружено матчей
+    const totalLoaded = (fixturesCurrentPage + 1) * fixturesLimit;
+    
+    if (totalLoaded < fixturesTotalCount) {
         html += `
-            <div style="text-align: center; margin-top: 1rem;">
-                <button id="load-more-fixtures" class="btn-secondary" onclick="loadMoreFixtures()">Показать ещё ↓</button>
+            <div id="load-more-fixtures-container" style="text-align: center; margin-top: 1rem;">
+                <button id="load-more-fixtures-btn" class="btn-secondary" onclick="loadMoreFixtures()">Показать ещё ↓</button>
             </div>
         `;
+    } else {
+        // Если все матчи загружены, удаляем контейнер с кнопкой
+        const existingContainer = document.getElementById('load-more-fixtures-container');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
     }
     
     list.innerHTML = html;
 }
 
 async function loadMoreFixtures() {
+    if (isLoadingFixtures) return;
+    
     fixturesCurrentPage++;
-    await loadFixturesWithPagination(fixturesCurrentPage + 1, true);
+    // Получаем текущий выбранный сезон из селектора (если есть)
+    const seasonSelect = document.getElementById('fixtures-season-filter');
+    const currentSeason = seasonSelect ? seasonSelect.value : null;
+    await loadFixturesWithPagination(fixturesCurrentPage + 1, true, currentSeason);
+    
+    // Прокручиваем страницу к кнопке, чтобы пользователь видел новые матчи
+    setTimeout(() => {
+        const loadMoreContainer = document.getElementById('load-more-fixtures-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, 100);
+}
+
+// Функция добавления селектора сезона для матчей
+function addFixturesSeasonSelector() {
+    const fixturesTab = document.getElementById('team-fixtures');
+    if (!fixturesTab) return;
+    
+    // Проверяем, не добавлен ли уже селектор
+    if (document.getElementById('fixtures-season-filter')) return;
+    
+    const seasonSelectorHtml = `
+        <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; gap: 0.5rem;">
+            <label>Сезон матчей:</label>
+            <select id="fixtures-season-filter" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                <option value="">Текущий сезон</option>
+            </select>
+            <button id="apply-fixtures-season" class="btn-primary" style="padding: 0.5rem 1rem;">Применить</button>
+        </div>
+    `;
+    
+    const fixturesList = document.getElementById('fixtures-list');
+    if (fixturesList) {
+        fixturesList.insertAdjacentHTML('beforebegin', seasonSelectorHtml);
+        
+        const seasons = generateSeasonsList();
+        const seasonSelect = document.getElementById('fixtures-season-filter');
+        seasons.forEach(season => {
+            const option = document.createElement('option');
+            option.value = season;
+            option.textContent = season;
+            seasonSelect.appendChild(option);
+        });
+        
+        document.getElementById('apply-fixtures-season').addEventListener('click', async () => {
+            const season = document.getElementById('fixtures-season-filter').value;
+            fixturesCurrentPage = 0; // Сбрасываем пагинацию
+            
+            // Удаляем старый контейнер с кнопкой, если есть
+            const existingContainer = document.getElementById('load-more-fixtures-container');
+            if (existingContainer) {
+                existingContainer.remove();
+            }
+            
+            await loadFixturesWithPagination(1, false, season || null);
+            showFilterMessage(`Матчи за сезон ${season || 'текущий'}`, 'success');
+        });
+    }
 }
 
 // Функция загрузки статистики с фильтрами
@@ -698,6 +783,8 @@ async function loadTeamData() {
         
         // Заполняем селекторы сезонов
         populateSeasonSelectors();
+        // Добавляем селектор сезона для матчей
+        addFixturesSeasonSelector();
         
         allStandings = standings;
         
@@ -908,7 +995,7 @@ async function loadTeamData() {
 
         // Матчи с пагинацией
         fixturesCurrentPage = 0;
-        await loadFixturesWithPagination(1, false);
+        await loadFixturesWithPagination(1, false, null);
         
         // Информация о турнире
         if (details.tournament) {

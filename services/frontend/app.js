@@ -13,8 +13,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadFavorites();
     
     // Event listeners
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    document.getElementById('register-form').addEventListener('submit', handleRegister);
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (registerForm) registerForm.addEventListener('submit', handleRegister);
     
     // Date navigation events
     const prevBtn = document.getElementById('prev-day');
@@ -58,7 +60,6 @@ function updateDateDisplay() {
         const day = String(currentMatchDate.getDate()).padStart(2, '0');
         dateInput.value = `${year}-${month}-${day}`;
         
-        // Обновляем flatpickr если он уже инициализирован
         if (dateInput._flatpickr) {
             dateInput._flatpickr.setDate(currentMatchDate);
         }
@@ -79,15 +80,10 @@ function goToToday() {
     loadRecentMatches();
 }
 
-// Проверка при загрузке страницы
-console.log('Страница загружена, проверяем сохраненный токен:', TokenManager.getToken());
-
 async function checkAuth() {
     const token = TokenManager.getToken();
-    console.log('=== НАЧАЛО ПРОВЕРКИ АУТЕНТИФИКАЦИИ ===');
     
     if (!token) {
-        console.log('Токен не найден');
         currentUser = null;
         updateAuthUI();
         return;
@@ -101,20 +97,14 @@ async function checkAuth() {
             }
         });
         
-        console.log('Статус ответа /me:', response.status);
-        
         if (response.ok) {
             currentUser = await response.json();
-            console.log('Пользователь аутентифицирован:', currentUser);
             updateAuthUI();
             if (document.getElementById('favorites-section')) {
                 document.getElementById('favorites-section').style.display = 'block';
-                if (typeof loadFavorites === 'function') {
-                    loadFavorites();
-                }
+                loadFavorites();
             }
         } else {
-            console.log('Ошибка аутентификации');
             currentUser = null;
             updateAuthUI();
         }
@@ -123,7 +113,6 @@ async function checkAuth() {
         currentUser = null;
         updateAuthUI();
     }
-    console.log('=== КОНЕЦ ПРОВЕРКИ АУТЕНТИФИКАЦИИ ===');
 }
 
 function updateAuthUI() {
@@ -159,7 +148,6 @@ async function handleLogin(e) {
         });
         
         const responseText = await response.text();
-        console.log('Ответ входа:', response.status, responseText);
         
         if (!response.ok) {
             errorDiv.textContent = responseText || 'Ошибка входа. Проверьте данные и попробуйте снова.';
@@ -217,7 +205,6 @@ async function handleRegister(e) {
         });
         
         const responseText = await response.text();
-        console.log('Ответ регистрации:', response.status, responseText);
         
         if (!response.ok) {
             if (response.status === 409) {
@@ -265,8 +252,9 @@ function switchTab(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
     const targetButton = event?.target || document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
-    targetButton?.classList.add('active');
-    document.getElementById(`${tabName}-form`).classList.add('active');
+    if (targetButton) targetButton.classList.add('active');
+    const form = document.getElementById(`${tabName}-form`);
+    if (form) form.classList.add('active');
 }
 
 async function loadRecentMatches() {
@@ -299,32 +287,53 @@ async function loadFavorites() {
     if (!container) return;
 
     try {
-        const favPlayers = TokenManager.hasToken() ? await playerAPI.getFavorites() : [];
-        const favTeams = TokenManager.hasToken() ? await teamAPI.getFavorites() : [];
-        const favTournaments = TokenManager.hasToken() ? await tournamentAPI.getFavorites() : [];
+        const [favPlayers, favTeams, favTournaments, favManagers] = await Promise.all([
+            TokenManager.hasToken() ? playerAPI.getFavorites() : [],
+            TokenManager.hasToken() ? teamAPI.getFavorites() : [],
+            TokenManager.hasToken() ? tournamentAPI.getFavorites() : [],
+            TokenManager.hasToken() ? managerAPI.getFavorites() : []
+        ]);
         
         let html = '';
         
         if (favPlayers?.length > 0) {
-            html += '<h3>⭐ Избранные игроки</h3><div class="players-grid">';
-            html += favPlayers.map(p => createPlayerCard(p)).join('');
+            html += '<h3>⭐ Избранные игроки</h3><div class="favorites-grid">';
+            for (const player of favPlayers) {
+                const details = await loadPlayerDetails(player.athlete_id || player.id);
+                html += createFavoritePlayerCard(player, details);
+            }
             html += '</div>';
         }
         
         if (favTeams?.length > 0) {
-            html += '<h3>🏆 Избранные команды</h3><div class="teams-grid">';
-            html += favTeams.map(t => createTeamCard(t)).join('');
+            html += '<h3>🏆 Избранные команды</h3><div class="favorites-grid">';
+            for (const team of favTeams) {
+                const details = await loadTeamDetails(team.team_id || team.id);
+                html += createFavoriteTeamCard(team, details);
+            }
             html += '</div>';
         }
         
         if (favTournaments?.length > 0) {
-            html += '<h3>🏅 Избранные турниры</h3><div class="tournaments-grid">';
-            html += favTournaments.map(t => createTournamentCard(t)).join('');
+            html += '<h3>🏅 Избранные турниры</h3><div class="favorites-grid">';
+            for (const tournament of favTournaments) {
+                const details = await loadTournamentDetails(tournament.tournament_id || tournament.id);
+                html += createFavoriteTournamentCard(tournament, details);
+            }
+            html += '</div>';
+        }
+        
+        if (favManagers?.length > 0) {
+            html += '<h3>👨‍✈️ Избранные тренеры</h3><div class="favorites-grid">';
+            for (const manager of favManagers) {
+                const details = await loadManagerDetails(manager.manager_id || manager.id);
+                html += createFavoriteManagerCard(manager, details);
+            }
             html += '</div>';
         }
 
         if (!html) {
-            html = '<p class="empty-favorites">✨ Пока нет избранных. Найдите и добавьте игроков, команды и турниры.</p>';
+            html = '<p class="empty-favorites">✨ Пока нет избранных. Найдите и добавьте игроков, команды, турниры и тренеров.</p>';
         }
 
         container.innerHTML = html;
@@ -332,6 +341,171 @@ async function loadFavorites() {
         console.error('Ошибка загрузки избранного:', error);
         container.innerHTML = '<p class="error">Не удалось загрузить избранное</p>';
     }
+}
+
+// Функции для загрузки деталей
+async function loadPlayerDetails(athleteId) {
+    try {
+        const response = await fetch(`/api/player/${athleteId}/details`);
+        if (response.ok) return await response.json();
+    } catch (error) {
+        console.error(`Ошибка загрузки деталей игрока ${athleteId}:`, error);
+    }
+    return null;
+}
+
+async function loadTeamDetails(teamId) {
+    try {
+        const response = await fetch(`/api/team/${teamId}/details`);
+        if (response.ok) return await response.json();
+    } catch (error) {
+        console.error(`Ошибка загрузки деталей команды ${teamId}:`, error);
+    }
+    return null;
+}
+
+async function loadTournamentDetails(tournamentId) {
+    try {
+        const response = await fetch(`/api/tournament/${tournamentId}/details`);
+        if (response.ok) return await response.json();
+    } catch (error) {
+        console.error(`Ошибка загрузки деталей турнира ${tournamentId}:`, error);
+    }
+    return null;
+}
+
+async function loadManagerDetails(managerId) {
+    try {
+        const response = await fetch(`/api/manager/${managerId}/details`);
+        if (response.ok) return await response.json();
+    } catch (error) {
+        console.error(`Ошибка загрузки деталей тренера ${managerId}:`, error);
+    }
+    return null;
+}
+
+function createFavoritePlayerCard(player, details) {
+    const firstName = details?.first_name || player.first_name || '';
+    const lastName = details?.last_name || player.last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim() || player.name || 'Неизвестно';
+    const photo = details?.url_photo || player.url_photo || '';
+    const position = details?.position || player.position || 'N/A';
+    const nation = details?.nation?.name || player.nation || '';
+    const playerId = player.athlete_id || player.id;
+    
+    const positionNames = { 'G': 'Вратарь', 'D': 'Защитник', 'M': 'Полузащитник', 'F': 'Нападающий' };
+    const positionDisplay = positionNames[position] || position;
+    const positionIcons = { 'G': '🧤', 'D': '🛡️', 'M': '⚡', 'F': '🎯' };
+    const positionIcon = positionIcons[position] || '⚽';
+    
+    return `
+        <div class="favorite-card" onclick="goToPlayer(${playerId})">
+            <div class="favorite-card-content">
+                <div class="favorite-avatar">
+                    ${photo ? 
+                        `<img src="${photo}" alt="${escapeHtml(fullName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>⚽</div>'">` : 
+                        `<div class="avatar-placeholder">⚽</div>`
+                    }
+                </div>
+                <div class="favorite-info">
+                    <div class="favorite-name">
+                        <strong>${escapeHtml(fullName)}</strong>
+                        ${nation ? `<span class="nation-badge">🌍 ${escapeHtml(nation)}</span>` : ''}
+                    </div>
+                    <div class="favorite-details">
+                        <span class="detail-badge">${positionIcon} ${escapeHtml(positionDisplay)}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="favorite-type-badge player-badge">⚽ Игрок</div>
+        </div>
+    `;
+}
+
+function createFavoriteTeamCard(team, details) {
+    const teamName = details?.name || team.name || 'Неизвестно';
+    const logo = details?.url_logo || team.url_logo || '';
+    const tournament = details?.tournament?.name || '';
+    const teamId = team.team_id || team.id;
+    
+    return `
+        <div class="favorite-card" onclick="goToTeam(${teamId})">
+            <div class="favorite-card-content">
+                <div class="favorite-avatar team-avatar">
+                    ${logo ? 
+                        `<img src="${logo}" alt="${escapeHtml(teamName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>🏆</div>'">` : 
+                        `<div class="avatar-placeholder">🏆</div>`
+                    }
+                </div>
+                <div class="favorite-info">
+                    <div class="favorite-name">
+                        <strong>${escapeHtml(teamName)}</strong>
+                    </div>
+                    ${tournament ? `<div class="favorite-details"><span class="detail-badge">🏆 ${escapeHtml(tournament)}</span></div>` : ''}
+                </div>
+            </div>
+            <div class="favorite-type-badge team-badge">🏆 Команда</div>
+        </div>
+    `;
+}
+
+function createFavoriteTournamentCard(tournament, details) {
+    const tournamentName = details?.name || tournament.name || 'Неизвестно';
+    const logo = details?.url_logo || tournament.url_logo || '';
+    const season = details?.season || tournament.season || '';
+    const tournamentId = tournament.tournament_id || tournament.id;
+    
+    return `
+        <div class="favorite-card" onclick="goToTournament(${tournamentId})">
+            <div class="favorite-card-content">
+                <div class="favorite-avatar">
+                    ${logo ? 
+                        `<img src="${logo}" alt="${escapeHtml(tournamentName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>🏆</div>'">` : 
+                        `<div class="avatar-placeholder">🏆</div>`
+                    }
+                </div>
+                <div class="favorite-info">
+                    <div class="favorite-name">
+                        <strong>${escapeHtml(tournamentName)}</strong>
+                    </div>
+                    ${season ? `<div class="favorite-details"><span class="detail-badge">📅 ${escapeHtml(season)}</span></div>` : ''}
+                </div>
+            </div>
+            <div class="favorite-type-badge tournament-badge">🏅 Турнир</div>
+        </div>
+    `;
+}
+
+function createFavoriteManagerCard(manager, details) {
+    const firstName = details?.first_name || manager.first_name || '';
+    const lastName = details?.last_name || manager.last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim() || manager.name || 'Неизвестно';
+    const photo = details?.url_photo || manager.url_photo || '';
+    const nation = details?.nation?.name || manager.nation || '';
+    const managerId = manager.manager_id || manager.id;
+    
+    return `
+        <div class="favorite-card" onclick="goToManager(${managerId})">
+            <div class="favorite-card-content">
+                <div class="favorite-avatar">
+                    ${photo ? 
+                        `<img src="${photo}" alt="${escapeHtml(fullName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>👨‍✈️</div>'">` : 
+                        `<div class="avatar-placeholder">👨‍✈️</div>`
+                    }
+                </div>
+                <div class="favorite-info">
+                    <div class="favorite-name">
+                        <strong>${escapeHtml(fullName)}</strong>
+                        ${nation ? `<span class="nation-badge">🌍 ${escapeHtml(nation)}</span>` : ''}
+                    </div>
+                    <div class="favorite-details">
+                        <span class="detail-badge">👨‍✈️ Главный тренер</span>
+                    </div>
+                </div>
+            </div>
+            <div class="favorite-type-badge manager-badge">👨‍✈️ Тренер</div>
+        </div>
+    `;
 }
 
 function createMatchCard(match) {
@@ -365,79 +539,36 @@ function createMatchCard(match) {
     
     return `
         <div class="card match-card" onclick="goToMatch(${matchId})">
-            <div class="match-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    ${tournamentLogo ? `<img src="${tournamentLogo}" alt="${tournamentName}" style="height: 20px; width: 20px; object-fit: contain;">` : '🏆'}
-                    <span style="font-size: 0.8rem; color: #666;">${tournamentName || 'Турнир'}</span>
+            <div class="match-header">
+                <div class="tournament-info">
+                    ${tournamentLogo ? `<img src="${tournamentLogo}" alt="${tournamentName}" style="height: 18px; width: 18px; object-fit: contain;">` : '🏆'}
+                    <span>${escapeHtml(tournamentName) || 'Турнир'}</span>
                 </div>
-                <div style="font-size: 0.8rem; color: #666;">${dateStr} • ${timeStr}</div>
+                <div class="match-time">${dateStr} • ${timeStr}</div>
             </div>
-            <div class="match-score" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; justify-content: flex-end;">
-                    ${homeTeamLogo ? `<img src="${homeTeamLogo}" alt="${homeTeam}" style="height: 35px; width: 35px; object-fit: contain;">` : ''}
-                    <span class="team-name" style="font-weight: 600; font-size: 1rem;">${homeTeam}</span>
+            <div class="match-score">
+                <div class="team-container home">
+                    ${homeTeamLogo ? `<img src="${homeTeamLogo}" alt="${escapeHtml(homeTeam)}" class="team-logo">` : ''}
+                    <span class="team-name">${escapeHtml(homeTeam)}</span>
                 </div>
-                <span class="score" style="font-size: 1.3rem; font-weight: bold; color: #2c3e50; min-width: 60px; text-align: center;">${homeScore} - ${awayScore}</span>
-                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
-                    <span class="team-name" style="font-weight: 600; font-size: 1rem;">${awayTeam}</span>
-                    ${awayTeamLogo ? `<img src="${awayTeamLogo}" alt="${awayTeam}" style="height: 35px; width: 35px; object-fit: contain;">` : ''}
+                <span class="score">${homeScore} - ${awayScore}</span>
+                <div class="team-container away">
+                    <span class="team-name">${escapeHtml(awayTeam)}</span>
+                    ${awayTeamLogo ? `<img src="${awayTeamLogo}" alt="${escapeHtml(awayTeam)}" class="team-logo">` : ''}
                 </div>
             </div>
-            <div class="match-status ${statusClass}" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #eee; text-align: center; font-size: 0.8rem;">
+            <div class="match-status ${statusClass}">
                 ${statusText}
             </div>
         </div>
     `;
 }
 
-function createPlayerCard(player) {
-    const name = player.first_name || player.FirstName || player.name || 'Игрок';
-    const position = player.position || player.Position || 'Н/Д';
-    const id = player.athlete_id || player.AthleteID || player.id;
-    
-    const positionMap = {
-        'Goalkeeper': 'Вратарь',
-        'Defender': 'Защитник',
-        'Midfielder': 'Полузащитник',
-        'Forward': 'Нападающий'
-    };
-    
-    const russianPosition = positionMap[position] || position;
-    
-    return `
-        <div class="card player-card" onclick="goToPlayer(${id})">
-            <h3>${name}</h3>
-            <p>${russianPosition}</p>
-            <div class="card-meta">
-                <span class="badge">${russianPosition}</span>
-            </div>
-        </div>
-    `;
-}
-
-function createTeamCard(team) {
-    const name = team.name || team.Name || 'Команда';
-    const id = team.team_id || team.TeamID || team.id;
-    
-    return `
-        <div class="card team-card" onclick="goToTeam(${id})">
-            <h3>${name}</h3>
-            <p>⚽ Футбольный клуб</p>
-        </div>
-    `;
-}
-
-function createTournamentCard(tournament) {
-    const name = tournament.name || tournament.Name || 'Турнир';
-    const season = tournament.season || tournament.Season || '';
-    const id = tournament.tournament_id || tournament.TournamentID || tournament.id;
-    
-    return `
-        <div class="card tournament-card" onclick="goToTournament(${id})">
-            <h3>${name}</h3>
-            ${season ? `<p>📅 Сезон ${season}</p>` : ''}
-        </div>
-    `;
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function performSearch() {

@@ -12,10 +12,11 @@ let currentSimilarParams = {
 };
 
 // Пагинация для матчей
-let fixturesCurrentPage = 0;
+let fixturesCurrentPage = 1;  // Начинаем с 1 страницы
 let fixturesLimit = 10;
 let fixturesTotalCount = 0;
 let isLoadingFixtures = false;
+let currentFixturesSeason = null;
 
 function getPlayerIdFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -90,14 +91,17 @@ function populateSimilarSeasons() {
 }
 
 // Функция загрузки матчей с пагинацией
-async function loadFixturesWithPagination(page = 1, append = false) {
+async function loadFixturesWithPagination(page = 1, append = false, season = null) {
     if (!playerId || isLoadingFixtures) return;
     
     isLoadingFixtures = true;
-    const offset = (page - 1) * fixturesLimit + 1;
+    const offset = (page - 1) * fixturesLimit + 1; // offset >= 1
     
     try {
-        const url = `/api/player/${playerId}/fixtures?limit=${fixturesLimit}&offset=${offset}`;
+        let url = `/api/player/${playerId}/fixtures?limit=${fixturesLimit}&offset=${offset}`;
+        if (season && season !== '') {
+            url += `&season=${encodeURIComponent(season)}`;
+        }
         console.log('Загрузка матчей из:', url);
         
         const response = await fetch(url);
@@ -106,13 +110,12 @@ async function loadFixturesWithPagination(page = 1, append = false) {
         }
         
         const fixtures = await response.json();
-        console.log('Матчи загружены:', fixtures);
+        console.log('Матчи загружены:', fixtures.length);
         
-        // Обновляем общее количество (если API возвращает total, иначе используем длину массива)
         if (fixtures.length < fixturesLimit) {
-            fixturesTotalCount = offset + fixtures.length;
+            fixturesTotalCount = offset + fixtures.length - 1;
         } else {
-            fixturesTotalCount = offset + fixturesLimit + 1; // Приблизительное значение
+            fixturesTotalCount = offset + fixturesLimit;
         }
         
         renderFixturesList(fixtures, append);
@@ -135,8 +138,10 @@ function renderFixturesList(fixtures, append = false) {
     
     let html = '';
     
-    if (append && list.innerHTML !== '<p>Матчи не найдены</p>') {
+    if (append && list.innerHTML !== '<p>Матчи не найдены</p>' && list.innerHTML !== '<p>Матчи недоступны</p>') {
         html = list.innerHTML;
+        // Удаляем старую кнопку "Показать ещё" из HTML, если она есть
+        html = html.replace(/<div id="load-more-fixtures-container"[\s\S]*?<\/div>/, '');
     } else {
         html = '';
     }
@@ -194,7 +199,7 @@ function renderFixturesList(fixtures, append = false) {
                         ${awayLogo ? `<img src="${awayLogo}" alt="${awayTeam}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
                     </div>
                 </div>
-                <div class="match-status ${statusClass}" style="display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
+                <div class="match-status ${statusClass}" style="display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
                     <span>${statusText}</span>
                     <span>⚽ ${goals} голов | 🎯 ${assists} передач | ⭐ ${rating} | ⏱️ ${minutes} мин.</span>
                 </div>
@@ -202,23 +207,95 @@ function renderFixturesList(fixtures, append = false) {
         `;
     }).join('');
     
-    // Добавляем кнопку "Показать ещё" если есть еще данные
-    const currentCount = (fixturesCurrentPage + 1) * fixturesLimit;
-    if (currentCount < fixturesTotalCount && !append) {
+    // Проверяем, нужно ли показывать кнопку
+    // Вычисляем сколько всего загружено матчей
+    const totalLoaded = fixturesCurrentPage * fixturesLimit;
+    
+    if (totalLoaded < fixturesTotalCount) {
         html += `
-            <div style="text-align: center; margin-top: 1rem;">
-                <button id="load-more-fixtures" class="btn-secondary" onclick="loadMoreFixtures()">Показать ещё ↓</button>
+            <div id="load-more-fixtures-container" style="text-align: center; margin-top: 1rem;">
+                <button id="load-more-fixtures-btn" class="btn-secondary" onclick="loadMoreFixtures()">Показать ещё ↓</button>
             </div>
         `;
+    } else {
+        // Если все матчи загружены, удаляем контейнер с кнопкой
+        const existingContainer = document.getElementById('load-more-fixtures-container');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
     }
     
     list.innerHTML = html;
 }
 
+// Добавьте функцию для добавления селектора сезона для матчей
+function addFixturesSeasonSelector() {
+    const fixturesTab = document.getElementById('player-fixtures');
+    if (!fixturesTab) return;
+    
+    // Проверяем, есть ли уже селектор
+    if (document.getElementById('fixtures-season-filter')) return;
+    
+    const seasonSelectorHtml = `
+        <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; gap: 0.5rem;">
+            <label>Сезон:</label>
+            <select id="fixtures-season-filter" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                <option value="">Текущий сезон</option>
+            </select>
+            <button id="apply-fixtures-season" class="btn-primary" style="padding: 0.5rem 1rem;">Применить</button>
+        </div>
+    `;
+    
+    const fixturesList = document.getElementById('fixtures-list');
+    if (fixturesList) {
+        fixturesList.insertAdjacentHTML('beforebegin', seasonSelectorHtml);
+        
+        // Заполняем сезоны
+        const seasons = generateSeasonsList();
+        const seasonSelect = document.getElementById('fixtures-season-filter');
+        seasons.forEach(season => {
+            const option = document.createElement('option');
+            option.value = season;
+            option.textContent = season;
+            seasonSelect.appendChild(option);
+        });
+        
+        // Добавляем обработчик
+        document.getElementById('apply-fixtures-season').addEventListener('click', applyFixturesSeasonFilter);
+    }
+}
+
 // Функция загрузки следующих страниц
 async function loadMoreFixtures() {
+    if (isLoadingFixtures) return;
+    
     fixturesCurrentPage++;
-    await loadFixturesWithPagination(fixturesCurrentPage, true);
+    await loadFixturesWithPagination(fixturesCurrentPage, true, currentFixturesSeason);
+    
+    // Прокручиваем страницу к кнопке, чтобы пользователь видел новые матчи
+    setTimeout(() => {
+        const loadMoreContainer = document.getElementById('load-more-fixtures-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, 100);
+}
+
+// Функция применения фильтра по сезону для матчей
+async function applyFixturesSeasonFilter() {
+    const seasonSelect = document.getElementById('fixtures-season-filter');
+    const season = seasonSelect?.value || null;
+    currentFixturesSeason = season;
+    fixturesCurrentPage = 1;  // Сбрасываем на первую страницу
+    
+    // Удаляем старый контейнер с кнопкой, если есть
+    const existingContainer = document.getElementById('load-more-fixtures-container');
+    if (existingContainer) {
+        existingContainer.remove();
+    }
+    
+    showFilterMessage(season ? `Загрузка матчей за сезон ${season}...` : 'Загрузка всех матчей...');
+    await loadFixturesWithPagination(1, false, currentFixturesSeason);
 }
 
 // Функция загрузки похожих игроков с параметрами
@@ -745,9 +822,13 @@ async function loadPlayerData() {
             `).join('');
         }
 
-        // Матчи с пагинацией
+        // Матчи с пагинацией и фильтром по сезону
         fixturesCurrentPage = 1;
-        await loadFixturesWithPagination(fixturesCurrentPage, false);
+        currentFixturesSeason = null;
+        await loadFixturesWithPagination(1, false, null);
+
+        // Добавляем селектор сезона для матчей
+        addFixturesSeasonSelector();
         
         // Проверяем избранное
         if (TokenManager.hasToken()) {

@@ -1,323 +1,280 @@
 // Функционал страницы поиска
-let searchResultsCache = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await checkAuth();
-    updateAuthUI();
-    
-    // Получаем query из URL path /search/query
-    const path = window.location.pathname;
-    let query = '';
-    
-    if (path.startsWith('/search/')) {
-        query = decodeURIComponent(path.substring(8));
-    } else {
-        const params = new URLSearchParams(window.location.search);
-        query = params.get('q');
-    }
-    
-    if (query) {
-        document.getElementById('search-input').value = query;
-        await performSearch();
-    }
+    try {
+        await checkAuth();
+        updateAuthUI();
+        
+        // Получаем query из URL
+        const path = window.location.pathname;
+        let query = '';
+        
+        if (path.startsWith('/search/')) {
+            query = decodeURIComponent(path.substring(8));
+        } else {
+            const params = new URLSearchParams(window.location.search);
+            query = params.get('q');
+        }
+        
+        if (query) {
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.value = query;
+            }
+            await performSearch();
+        }
 
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    document.getElementById('register-form').addEventListener('submit', handleRegister);
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        if (loginForm) loginForm.addEventListener('submit', handleLogin);
+        if (registerForm) registerForm.addEventListener('submit', handleRegister);
+        
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка инициализации:', error);
+    }
 });
 
-// Функция для загрузки деталей игроков
-async function loadPlayerDetails(athleteId) {
-    try {
-        const response = await fetch(`/api/player/${athleteId}/details`);
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error(`Ошибка загрузки деталей игрока ${athleteId}:`, error);
-    }
-    return null;
-}
-
-// Функция для загрузки деталей команд
-async function loadTeamDetails(teamId) {
-    try {
-        const response = await fetch(`/api/team/${teamId}/details`);
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error(`Ошибка загрузки деталей команды ${teamId}:`, error);
-    }
-    return null;
-}
-
-// Функция для загрузки деталей турниров
-async function loadTournamentDetails(tournamentId) {
-    try {
-        const response = await fetch(`/api/tournament/${tournamentId}/details`);
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error(`Ошибка загрузки деталей турнира ${tournamentId}:`, error);
-    }
-    return null;
-}
-
-// Функция для загрузки деталей тренеров
-async function loadManagerDetails(managerId) {
-    try {
-        const response = await fetch(`/api/manager/${managerId}/details`);
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error(`Ошибка загрузки деталей тренера ${managerId}:`, error);
-    }
-    return null;
-}
-
 async function performSearch() {
-    const query = document.getElementById('search-input').value.trim();
+    const searchInput = document.getElementById('search-input');
+    if (!searchInput) return;
+    
+    const query = searchInput.value.trim();
+    const resultsWrapper = document.getElementById('search-results-wrapper');
+    
+    if (!resultsWrapper) return;
+    
     if (!query) {
-        document.getElementById('search-results').innerHTML = '<p class="loading">Введите поисковый запрос</p>';
+        resultsWrapper.innerHTML = '<p class="loading">Введите поисковый запрос</p>';
         return;
     }
 
-    // Обновляем URL без перезагрузки
     window.history.pushState({}, '', `/search/${encodeURIComponent(query)}`);
 
-    const resultsDiv = document.getElementById('search-results');
-    resultsDiv.innerHTML = '<p class="loading">Поиск...</p>';
+    resultsWrapper.innerHTML = '<div class="search-loading">🔍 Поиск...</div>';
 
     try {
+        if (typeof searchAPI === 'undefined' || !searchAPI.search) {
+            throw new Error('API поиска не загружен');
+        }
+        
         const response = await searchAPI.search(query);
         console.log('Ответ поиска:', response);
         
-        if (!response || (response.total === 0 && (!response.results || response.results.length === 0))) {
-            resultsDiv.innerHTML = '<p class="loading">Ничего не найдено</p>';
+        if (!response || !response.results || response.results.length === 0) {
+            resultsWrapper.innerHTML = `
+                <div class="search-no-results">
+                    <div class="no-results-icon">😔</div>
+                    <p>Ничего не найдено по запросу "${escapeHtml(query)}"</p>
+                    <p style="font-size: 0.9rem; color: #666;">Попробуйте изменить поисковый запрос</p>
+                </div>
+            `;
             return;
         }
 
-        // Собираем все результаты в один массив с дополнительными данными
-        const allResults = [];
+        // Сортируем результаты по убыванию score
+        const sortedResults = [...response.results].sort((a, b) => b.score - a.score);
         
-        if (response.results && Array.isArray(response.results)) {
-            for (const item of response.results) {
-                const result = {
-                    type: item.type,
-                    score: item.score,
-                    data: item.data
-                };
-                
-                // Загружаем дополнительные данные в зависимости от типа
-                if (item.type === 'player' && item.data.athlete_id) {
-                    const details = await loadPlayerDetails(item.data.athlete_id);
-                    if (details) {
-                        result.details = details;
-                    }
-                } else if (item.type === 'team' && item.data.team_id) {
-                    const details = await loadTeamDetails(item.data.team_id);
-                    if (details) {
-                        result.details = details;
-                    }
-                } else if (item.type === 'tournament' && item.data.tournament_id) {
-                    const details = await loadTournamentDetails(item.data.tournament_id);
-                    if (details) {
-                        result.details = details;
-                    }
-                } else if (item.type === 'manager' && item.data.manager_id) {
-                    const details = await loadManagerDetails(item.data.manager_id);
-                    if (details) {
-                        result.details = details;
-                    }
-                }
-                
-                allResults.push(result);
-            }
-        }
+        let html = `
+            <div class="search-results-container">
+                <div class="search-stats">
+                    <span class="stats-icon">🔍</span>
+                    Найдено: ${response.total || sortedResults.length} результатов по запросу "${escapeHtml(query)}"
+                </div>
+                <div class="search-results-list">
+        `;
         
-        // Сортируем по убыванию score
-        allResults.sort((a, b) => b.score - a.score);
-        
-        // Отрисовываем все результаты в одном списке
-        let html = '<div class="search-results-list">';
-        
-        for (const result of allResults) {
+        for (const result of sortedResults) {
             html += createSearchResultCard(result);
         }
         
-        html += '</div>';
+        html += `
+                </div>
+            </div>
+        `;
         
-        if (allResults.length === 0) {
-            html = '<p class="loading">Ничего не найдено</p>';
-        }
-        
-        resultsDiv.innerHTML = html;
+        resultsWrapper.innerHTML = html;
         
     } catch (error) {
         console.error('Ошибка поиска:', error);
-        resultsDiv.innerHTML = '<p class="loading">Ошибка поиска. Пожалуйста, попробуйте снова.</p>';
+        resultsWrapper.innerHTML = `
+            <div class="search-error">
+                <div class="error-icon">❌</div>
+                <p>Ошибка поиска</p>
+                <p style="font-size: 0.9rem;">Пожалуйста, попробуйте снова</p>
+                <button onclick="performSearch()" class="btn-primary" style="margin-top: 1rem;">Повторить</button>
+            </div>
+        `;
     }
 }
 
 function createSearchResultCard(result) {
     const type = result.type;
-    const score = result.score ? (result.score * 100).toFixed(1) : null;
     const data = result.data;
-    const details = result.details;
     
-    // Определяем тип на русском и иконку
+    // Типы сущностей
     const typeInfo = {
-        player: { label: 'Игрок', icon: '👤', color: '#3498db' },
-        team: { label: 'Команда', icon: '🏆', color: '#2ecc71' },
-        tournament: { label: 'Турнир', icon: '🏆', color: '#e74c3c' },
-        manager: { label: 'Тренер', icon: '👨‍✈️', color: '#f39c12' }
+        player: { label: 'Игрок', icon: '⚽', gradient: 'linear-gradient(135deg, #3498db, #2980b9)' },
+        team: { label: 'Команда', icon: '🏆', gradient: 'linear-gradient(135deg, #2ecc71, #27ae60)' },
+        tournament: { label: 'Турнир', icon: '🏆', gradient: 'linear-gradient(135deg, #e74c3c, #c0392b)' },
+        manager: { label: 'Тренер', icon: '👨‍✈️', gradient: 'linear-gradient(135deg, #f39c12, #e67e22)' }
     };
     
-    const info = typeInfo[type] || { label: type.toUpperCase(), icon: '📌', color: '#95a5a6' };
+    const info = typeInfo[type] || { label: type.toUpperCase(), icon: '📌', gradient: 'linear-gradient(135deg, #95a5a6, #7f8c8d)' };
     
     let content = '';
+    let linkUrl = '';
+    
+    // Получаем ID в зависимости от типа
+    let entityId = null;
+    if (type === 'player') {
+        entityId = data.id || data.athlete_id;
+        linkUrl = `/player?id=${entityId}`;
+    } else if (type === 'team') {
+        entityId = data.team_id || data.id;
+        linkUrl = `/team?id=${entityId}`;
+    } else if (type === 'tournament') {
+        entityId = data.tournament_id || data.id;
+        linkUrl = `/tournament?id=${entityId}`;
+    } else if (type === 'manager') {
+        entityId = data.manager_id || data.id;
+        linkUrl = `/manager?id=${entityId}`;
+    }
     
     if (type === 'player') {
-        const firstName = details?.first_name || data.first_name || '';
-        const lastName = details?.last_name || data.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim() || data.name || 'Неизвестно';
-        const photo = details?.url_photo || '';
-        const position = details?.position || data.position || 'Н/Д';
-        const nationName = details?.nation?.name || '';
-        const nationFlag = details?.nation?.url_flag || '';
+        const firstName = data.first_name || '';
+        const lastName = data.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim() || 'Неизвестно';
+        const photo = data.url_photo || '';
+        const position = data.position || 'N/A';
+        const nation = data.nation || '';
+        const status = data.current_status || '';
+        const height = data.height || '';
         
         const positionNames = { 'G': 'Вратарь', 'D': 'Защитник', 'M': 'Полузащитник', 'F': 'Нападающий' };
         const positionDisplay = positionNames[position] || position;
+        const positionIcons = { 'G': '🧤', 'D': '🛡️', 'M': '⚡', 'F': '🎯' };
+        const positionIcon = positionIcons[position] || '⚽';
+        
+        const statusClass = status === 'Active' ? 'status-active' : 'status-retired';
+        const statusText = status === 'Active' ? 'Активен' : 'Завершил карьеру';
         
         content = `
-            <div style="display: flex; align-items: center; gap: 15px;">
-                ${photo ? `<img src="${photo}" alt="${fullName}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">` : 
-                          `<div style="width: 60px; height: 60px; background: #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">👤</div>`}
-                <div style="flex: 1;">
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <strong style="font-size: 1.1rem;">${fullName}</strong>
-                        ${nationFlag ? `<img src="${nationFlag}" alt="${nationName}" style="height: 20px;">` : ''}
-                        ${nationName ? `<span style="font-size: 0.8rem; color: #666;">${nationName}</span>` : ''}
-                    </div>
-                    <div style="font-size: 0.85rem; color: #666;">${positionDisplay}</div>
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
+            <div class="result-card-content">
+                <div class="result-avatar">
+                    ${photo ? 
+                        `<img src="${photo}" alt="${escapeHtml(fullName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>${info.icon}</div>'">` : 
+                        `<div class="avatar-placeholder">${info.icon}</div>`
+                    }
                 </div>
-            </div>
-        `;
-    } 
-    else if (type === 'team') {
-        const teamName = details?.name || data.name || 'Неизвестно';
-        const logo = details?.url_logo || data.url_logo || '';
-        const tournament = details?.tournament?.name || '';
-        
-        content = `
-            <div style="display: flex; align-items: center; gap: 15px;">
-                ${logo ? `<img src="${logo}" alt="${teamName}" style="width: 50px; height: 50px; object-fit: contain;">` : 
-                         `<div style="width: 50px; height: 50px; background: #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🏆</div>`}
-                <div style="flex: 1;">
-                    <strong style="font-size: 1.1rem;">${teamName}</strong>
-                    ${tournament ? `<div style="font-size: 0.8rem; color: #666;">${tournament}</div>` : ''}
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
-                </div>
-            </div>
-        `;
-    }
-    else if (type === 'tournament') {
-        const tournamentName = details?.name || data.name || 'Неизвестно';
-        const logo = details?.url_logo || data.url_logo || '';
-        const season = details?.season || data.season || '';
-        const country = details?.country?.name || '';
-        const countryFlag = details?.country?.url_flag || '';
-        
-        content = `
-            <div style="display: flex; align-items: center; gap: 15px;">
-                ${logo ? `<img src="${logo}" alt="${tournamentName}" style="width: 50px; height: 50px; object-fit: contain;">` : 
-                         `<div style="width: 50px; height: 50px; background: #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🏆</div>`}
-                <div style="flex: 1;">
-                    <strong style="font-size: 1.1rem;">${tournamentName}</strong>
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        ${season ? `<span style="font-size: 0.8rem; color: #666;">${season}</span>` : ''}
-                        ${countryFlag ? `<img src="${countryFlag}" alt="${country}" style="height: 16px;">` : ''}
-                        ${country ? `<span style="font-size: 0.8rem; color: #666;">${country}</span>` : ''}
+                <div class="result-info">
+                    <div class="result-name">
+                        <strong>${escapeHtml(fullName)}</strong>
+                        ${nation ? `<span class="nation-badge">🌍 ${escapeHtml(nation)}</span>` : ''}
+                        <span class="status-badge ${statusClass}">${statusText}</span>
                     </div>
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
+                    <div class="result-details">
+                        <span class="detail-badge">${positionIcon} ${escapeHtml(positionDisplay)}</span>
+                        ${height ? `<span class="detail-badge">📏 ${height} см</span>` : ''}
+                    </div>
                 </div>
             </div>
         `;
     }
     else if (type === 'manager') {
-        const firstName = details?.first_name || '';
-        const lastName = details?.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim() || data.name || 'Неизвестно';
-        const photo = details?.url_photo || '';
-        const nationName = details?.nation?.name || '';
-        const nationFlag = details?.nation?.url_flag || '';
+        const firstName = data.first_name || '';
+        const lastName = data.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim() || 'Неизвестно';
+        const photo = data.url_photo || '';
+        const nation = data.nation || '';
         
         content = `
-            <div style="display: flex; align-items: center; gap: 15px;">
-                ${photo ? `<img src="${photo}" alt="${fullName}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">` : 
-                          `<div style="width: 60px; height: 60px; background: #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">👨‍✈️</div>`}
-                <div style="flex: 1;">
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <strong style="font-size: 1.1rem;">${fullName}</strong>
-                        ${nationFlag ? `<img src="${nationFlag}" alt="${nationName}" style="height: 20px;">` : ''}
-                        ${nationName ? `<span style="font-size: 0.8rem; color: #666;">${nationName}</span>` : ''}
+            <div class="result-card-content">
+                <div class="result-avatar">
+                    ${photo ? 
+                        `<img src="${photo}" alt="${escapeHtml(fullName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>${info.icon}</div>'">` : 
+                        `<div class="avatar-placeholder">${info.icon}</div>`
+                    }
+                </div>
+                <div class="result-info">
+                    <div class="result-name">
+                        <strong>${escapeHtml(fullName)}</strong>
+                        ${nation ? `<span class="nation-badge">🌍 ${escapeHtml(nation)}</span>` : ''}
                     </div>
-                    <div style="font-size: 0.85rem; color: #666;">Тренер</div>
-                    ${score ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 4px;">Совпадение: ${score}%</div>` : ''}
+                    <div class="result-details">
+                        <span class="detail-badge">👨‍✈️ Главный тренер</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    else if (type === 'team') {
+        const teamName = data.name || 'Неизвестно';
+        const logo = data.url_logo || '';
+        
+        content = `
+            <div class="result-card-content">
+                <div class="result-avatar team-avatar">
+                    ${logo ? 
+                        `<img src="${logo}" alt="${escapeHtml(teamName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>${info.icon}</div>'">` : 
+                        `<div class="avatar-placeholder">${info.icon}</div>`
+                    }
+                </div>
+                <div class="result-info">
+                    <div class="result-name">
+                        <strong>${escapeHtml(teamName)}</strong>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    else if (type === 'tournament') {
+        const tournamentName = data.name || 'Неизвестно';
+        const logo = data.url_logo || '';
+        const season = data.season || '';
+        
+        content = `
+            <div class="result-card-content">
+                <div class="result-avatar">
+                    ${logo ? 
+                        `<img src="${logo}" alt="${escapeHtml(tournamentName)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'avatar-placeholder\\'>${info.icon}</div>'">` : 
+                        `<div class="avatar-placeholder">${info.icon}</div>`
+                    }
+                </div>
+                <div class="result-info">
+                    <div class="result-name">
+                        <strong>${escapeHtml(tournamentName)}</strong>
+                    </div>
+                    ${season ? `<div class="result-details"><span class="detail-badge">📅 ${escapeHtml(season)}</span></div>` : ''}
                 </div>
             </div>
         `;
     }
     
-    // Генерация ID для ссылки
-    let linkUrl = '';
-    if (type === 'player') {
-        const playerId = details?.athlete_id || data.athlete_id || data.id;
-        linkUrl = `/player?id=${playerId}`;
-    } else if (type === 'team') {
-        const teamId = details?.team_id || data.team_id || data.id;
-        linkUrl = `/team?id=${teamId}`;
-    } else if (type === 'tournament') {
-        const tournamentId = details?.tournament_id || data.tournament_id || data.id;
-        linkUrl = `/tournament?id=${tournamentId}`;
-    } else if (type === 'manager') {
-        const managerId = details?.manager_id || data.manager_id || data.id;
-        linkUrl = `/manager?id=${managerId}`;
-    }
-    
     return `
-        <div class="result-card" onclick="goToPage('${linkUrl}')" style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem;">
-            <div style="flex: 1;">
-                ${content}
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
-                <span class="result-type" style="background: ${info.color};">${info.icon} ${info.label}</span>
-                <span style="font-size: 0.7rem; color: #666;">Совпадение: ${(score || 0)}%</span>
+        <div class="result-card" onclick="goToPage('${linkUrl}')">
+            ${content}
+            <div class="result-type-badge" style="background: ${info.gradient}">
+                ${info.icon} ${info.label}
             </div>
         </div>
     `;
 }
 
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function goToPage(url) {
     window.location.href = url;
-}
-
-// Функции для перехода (если их нет в app.js)
-function goToPlayer(id) {
-    window.location.href = `/player?id=${id}`;
-}
-
-function goToTeam(id) {
-    window.location.href = `/team?id=${id}`;
-}
-
-function goToTournament(id) {
-    window.location.href = `/tournament?id=${id}`;
-}
-
-function goToManager(id) {
-    window.location.href = `/manager?id=${id}`;
 }

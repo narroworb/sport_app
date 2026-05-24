@@ -21,6 +21,12 @@ let currentPlayersStatsData = [];
 let currentTeamsSort = { column: 'team_name', direction: 'asc' };
 let currentPlayersSort = { column: 'goals', direction: 'desc' };
 
+// Пагинация для матчей по турам
+let fixturesCurrentRound = 1;
+let fixturesRoundsData = {};
+let isLoadingFixtures = false;
+let allRoundsList = [];
+
 // Кэш для данных игроков
 let playersDetailsCache = new Map();
 
@@ -128,6 +134,261 @@ async function loadPlayersStatsWithPagination(page = 1, append = false) {
         }
     } finally {
         isLoadingPlayersStats = false;
+    }
+}
+
+// Функция загрузки матчей турнира с пагинацией по турам
+async function loadTournamentFixturesWithPagination(startRound = 1, roundsToLoad = 5) {
+    if (!tournamentId || isLoadingFixtures) return;
+    
+    isLoadingFixtures = true;
+    
+    try {
+        // Загружаем все матчи турнира
+        const allFixtures = await tournamentAPI.getFixtures(tournamentId);
+        
+        if (!allFixtures || typeof allFixtures !== 'object') {
+            throw new Error('Некорректные данные матчей');
+        }
+        
+        // Собираем все матчи с информацией о туре
+        const matchesByRound = {};
+        let maxRound = 0;
+        
+        for (const round in allFixtures) {
+            if (Array.isArray(allFixtures[round])) {
+                const roundNum = parseInt(round);
+                matchesByRound[roundNum] = allFixtures[round].map(match => ({
+                    ...match,
+                    round: roundNum
+                }));
+                maxRound = Math.max(maxRound, roundNum);
+            }
+        }
+        
+        // Получаем отсортированный список туров
+        allRoundsList = Object.keys(matchesByRound).map(Number).sort((a, b) => a - b);
+        fixturesRoundsData = matchesByRound;
+        
+        // Загружаем начальные туры
+        const endRound = Math.min(startRound + roundsToLoad - 1, maxRound);
+        const roundsToShow = allRoundsList.filter(r => r >= startRound && r <= endRound);
+        
+        renderFixturesByRounds(roundsToShow);
+        
+        // Добавляем кнопку для загрузки следующих туров
+        if (endRound < maxRound) {
+            addLoadMoreRoundsButton(endRound + 1, maxRound);
+        } else {
+            removeLoadMoreRoundsButton();
+        }
+        
+    } catch (error) {
+        console.error('Ошибка загрузки матчей турнира:', error);
+        const list = document.getElementById('fixtures-list');
+        if (list) {
+            list.innerHTML = '<p>Матчи недоступны</p>';
+        }
+    } finally {
+        isLoadingFixtures = false;
+    }
+}
+
+function renderFixturesByRounds(roundsToShow) {
+    const list = document.getElementById('fixtures-list');
+    if (!list) return;
+    
+    let html = '';
+    
+    for (const round of roundsToShow) {
+        const matches = fixturesRoundsData[round];
+        if (!matches || matches.length === 0) continue;
+        
+        // Сортируем матчи по дате
+        const sortedMatches = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        html += `
+            <div class="round-group" style="margin-bottom: 2rem;">
+                <div class="round-header" style="background: linear-gradient(135deg, #2c3e50, #34495e); color: white; padding: 0.75rem 1rem; border-radius: 8px 8px 0 0; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0; font-size: 1.1rem;">🏆 Тур ${round}</h3>
+                </div>
+                <div class="round-matches">
+                    ${sortedMatches.map(match => renderMatchCard(match)).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    list.innerHTML = html;
+}
+
+function renderMatchCard(match) {
+    const homeTeam = match.home_team?.name || 'Хозяева';
+    const awayTeam = match.away_team?.name || 'Гости';
+    const homeLogo = match.home_team?.url_logo || '';
+    const awayLogo = match.away_team?.url_logo || '';
+    const homeScore = match.home_team_score ?? '-';
+    const awayScore = match.away_team_score ?? '-';
+    const matchId = match.match_id;
+    const date = match.date ? new Date(match.date) : new Date();
+    const status = match.status || 'Not started';
+    const tournament = match.tournament?.name || '';
+    
+    let statusClass = '';
+    let statusText = '';
+    if (status === 'Ended') {
+        statusClass = 'status-ended';
+        statusText = '✓ Завершен';
+    } else if (status === 'Not started') {
+        statusClass = 'status-scheduled';
+        statusText = '⏱ Запланирован';
+    } else if (status === 'In Progress' || status === 'Live') {
+        statusClass = 'status-live';
+        statusText = '🟢 В прямом эфире';
+    }
+    
+    return `
+        <div class="card match-card" style="cursor:pointer; margin-bottom: 0.75rem;" onclick="goToMatch(${matchId})">
+            <div class="match-header" style="display: flex; justify-content: space-between; padding-bottom: 0.5rem; border-bottom: 1px solid #eee;">
+                <span style="font-size: 0.8rem; color: #666;">${date.toLocaleDateString('ru-RU')}</span>
+                <span style="font-size: 0.8rem; color: #666;">${tournament}</span>
+            </div>
+            <div class="match-score" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0;">
+                <div class="team-container" style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
+                    ${homeLogo ? `<img src="${homeLogo}" alt="${escapeHtml(homeTeam)}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
+                    <span class="team-name" style="font-weight: 600;">${escapeHtml(homeTeam)}</span>
+                </div>
+                <span class="score" style="font-size: 1.2rem; font-weight: bold; color: #2c3e50;">${homeScore} : ${awayScore}</span>
+                <div class="team-container" style="display: flex; align-items: center; gap: 10px; min-width: 140px; justify-content: flex-end;">
+                    <span class="team-name" style="font-weight: 600;">${escapeHtml(awayTeam)}</span>
+                    ${awayLogo ? `<img src="${awayLogo}" alt="${escapeHtml(awayTeam)}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
+                </div>
+            </div>
+            <div class="match-status ${statusClass}" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #eee; text-align: center; font-size: 0.8rem;">
+                ${statusText}
+            </div>
+        </div>
+    `;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function addLoadMoreRoundsButton(nextRound, maxRound) {
+    const list = document.getElementById('fixtures-list');
+    if (!list) return;
+    
+    // Удаляем существующую кнопку, если есть
+    removeLoadMoreRoundsButton();
+    
+    const buttonHtml = `
+        <div id="load-more-rounds-container" style="text-align: center; margin-top: 1rem;">
+            <button id="load-more-rounds-btn" class="btn-primary" onclick="loadMoreRounds()" style="padding: 0.75rem 2rem;">
+                📋 Показать следующие туры (${nextRound}-${Math.min(nextRound + 4, maxRound)})
+            </button>
+        </div>
+    `;
+    
+    list.insertAdjacentHTML('beforeend', buttonHtml);
+}
+
+function removeLoadMoreRoundsButton() {
+    const existingContainer = document.getElementById('load-more-rounds-container');
+    if (existingContainer) {
+        existingContainer.remove();
+    }
+}
+
+async function loadMoreRounds() {
+    if (isLoadingFixtures) return;
+    
+    // Находим следующий тур для загрузки
+    const currentRoundsDisplayed = document.querySelectorAll('.round-group');
+    let lastRoundDisplayed = 0;
+    currentRoundsDisplayed.forEach(group => {
+        const header = group.querySelector('.round-header h3');
+        if (header) {
+            const match = header.textContent.match(/Тур (\d+)/);
+            if (match) {
+                lastRoundDisplayed = Math.max(lastRoundDisplayed, parseInt(match[1]));
+            }
+        }
+    });
+    
+    const nextStartRound = lastRoundDisplayed + 1;
+    const endRound = Math.min(nextStartRound + 4, Math.max(...allRoundsList));
+    
+    if (nextStartRound > endRound) {
+        removeLoadMoreRoundsButton();
+        return;
+    }
+    
+    isLoadingFixtures = true;
+    
+    // Показываем индикатор загрузки
+    const loadMoreBtn = document.getElementById('load-more-rounds-btn');
+    if (loadMoreBtn) {
+        const originalText = loadMoreBtn.textContent;
+        loadMoreBtn.textContent = '⏳ Загрузка...';
+        loadMoreBtn.disabled = true;
+        
+        try {
+            // Загружаем следующие туры
+            const roundsToShow = allRoundsList.filter(r => r >= nextStartRound && r <= endRound);
+            renderAdditionalRounds(roundsToShow);
+            
+            // Обновляем кнопку или удаляем если больше нет туров
+            if (endRound >= Math.max(...allRoundsList)) {
+                removeLoadMoreRoundsButton();
+            } else {
+                loadMoreBtn.textContent = originalText;
+                loadMoreBtn.disabled = false;
+            }
+        } finally {
+            isLoadingFixtures = false;
+        }
+    }
+}
+
+function renderAdditionalRounds(roundsToShow) {
+    const list = document.getElementById('fixtures-list');
+    if (!list) return;
+    
+    // Удаляем существующую кнопку загрузки
+    removeLoadMoreRoundsButton();
+    
+    let html = '';
+    
+    for (const round of roundsToShow) {
+        const matches = fixturesRoundsData[round];
+        if (!matches || matches.length === 0) continue;
+        
+        const sortedMatches = [...matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        html += `
+            <div class="round-group" style="margin-bottom: 2rem;">
+                <div class="round-header" style="background: linear-gradient(135deg, #2c3e50, #34495e); color: white; padding: 0.75rem 1rem; border-radius: 8px 8px 0 0; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0; font-size: 1.1rem;">🏆 Тур ${round}</h3>
+                </div>
+                <div class="round-matches">
+                    ${sortedMatches.map(match => renderMatchCard(match)).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    list.insertAdjacentHTML('beforeend', html);
+    
+    // Добавляем кнопку для следующих туров, если нужно
+    const maxRound = Math.max(...allRoundsList);
+    const lastRound = roundsToShow[roundsToShow.length - 1];
+    
+    if (lastRound < maxRound) {
+        addLoadMoreRoundsButton(lastRound + 1, maxRound);
     }
 }
 
@@ -671,68 +932,8 @@ async function loadTournamentData() {
             addPlayersSortingHandlers();
         }, 200);
 
-        // Матчи
-        if (fixtures && typeof fixtures === 'object') {
-            const list = document.getElementById('fixtures-list');
-            const allMatches = [];
-            for (const round in fixtures) {
-                if (Array.isArray(fixtures[round])) {
-                    fixtures[round].forEach(match => {
-                        allMatches.push({ ...match, round: parseInt(round) });
-                    });
-                }
-            }
-            allMatches.sort((a, b) => new Date(a.date) - new Date(b.date));
-            
-            list.innerHTML = allMatches.slice(0, 50).map(match => {
-                const homeTeam = match.home_team?.name || 'Хозяева';
-                const awayTeam = match.away_team?.name || 'Гости';
-                const homeLogo = match.home_team?.url_logo || '';
-                const awayLogo = match.away_team?.url_logo || '';
-                const homeScore = match.home_team_score ?? '-';
-                const awayScore = match.away_team_score ?? '-';
-                const matchId = match.match_id;
-                const date = match.date ? new Date(match.date) : new Date();
-                const status = match.status || 'Not started';
-                const round = match.round || 'Н/Д';
-                
-                let statusClass = '';
-                let statusText = '';
-                if (status === 'Ended') {
-                    statusClass = 'status-ended';
-                    statusText = '✓ Завершен';
-                } else if (status === 'Not started') {
-                    statusClass = 'status-scheduled';
-                    statusText = '⏱ Запланирован';
-                } else if (status === 'In Progress' || status === 'Live') {
-                    statusClass = 'status-live';
-                    statusText = '🟢 В прямом эфире';
-                }
-                
-                return `
-                    <div class="card match-card" style="cursor:pointer; margin-bottom: 1rem;" onclick="goToMatch(${matchId})">
-                        <div class="match-header" style="display: flex; justify-content: space-between;">
-                            <span>Тур ${round}</span>
-                            <span>${date.toLocaleDateString('ru-RU')}</span>
-                        </div>
-                        <div class="match-score" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div class="team-container" style="display: flex; align-items: center; gap: 10px; min-width: 120px;">
-                                ${homeLogo ? `<img src="${homeLogo}" alt="${homeTeam}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
-                                <span class="team-name">${homeTeam}</span>
-                            </div>
-                            <span class="score" style="font-size: 1.2rem; font-weight: bold;">${homeScore} : ${awayScore}</span>
-                            <div class="team-container" style="display: flex; align-items: center; gap: 10px; min-width: 120px;">
-                                <span class="team-name">${awayTeam}</span>
-                                ${awayLogo ? `<img src="${awayLogo}" alt="${awayTeam}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
-                            </div>
-                        </div>
-                        <div class="match-status ${statusClass}" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; text-align: center;">
-                            ${statusText}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
+        // Матчи с группировкой по турам и пагинацией
+        await loadTournamentFixturesWithPagination(1, 5);
 
         // График истории позиций
         if (positionHistoryData && Array.isArray(positionHistoryData) && positionHistoryData.length > 0) {
@@ -977,3 +1178,4 @@ function goToPlayer(id) {
 
 window.loadMoreTeamsStats = loadMoreTeamsStats;
 window.loadMorePlayersStats = loadMorePlayersStats;
+window.loadMoreRounds = loadMoreRounds;

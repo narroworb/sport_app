@@ -10,6 +10,13 @@ let currentSeasonsSort = { column: 'season', direction: 'desc' };
 let currentTeamsData = [];
 let currentSeasonsData = [];
 
+// Пагинация для матчей тренера
+let fixturesCurrentPage = 0;
+let fixturesLimit = 10;
+let fixturesTotalCount = 0;
+let isLoadingFixtures = false;
+let currentFixturesSeason = null;
+
 // Вспомогательная функция для экранирования HTML
 function escapeHtml(text) {
     if (!text) return '';
@@ -44,8 +51,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    document.getElementById('register-form').addEventListener('submit', handleRegister);
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (registerForm) registerForm.addEventListener('submit', handleRegister);
 });
 
 async function loadManagerStatsWithParams(params = {}) {
@@ -294,7 +303,7 @@ function sortSeasonsData(column) {
             case 'season':
                 aVal = a.season;
                 bVal = b.season;
-                return currentTeamsSort.direction === 'asc' 
+                return currentSeasonsSort.direction === 'asc' 
                     ? aVal.localeCompare(bVal) 
                     : bVal.localeCompare(aVal);
             case 'matches':
@@ -560,85 +569,51 @@ async function loadManagerData() {
         currentStatsData = stats;
         renderAggregatedStats(stats);
 
-        // Команды
-        if (teams && typeof teams === 'object' && Object.keys(teams).length > 0) {
+        // Команды - ИСПРАВЛЕННЫЙ БЛОК
+        if (teams && Array.isArray(teams) && teams.length > 0) {
             const list = document.getElementById('teams-list');
-            const teamsArray = [];
             
-            for (const [teamName, seasons] of Object.entries(teams)) {
-                if (Array.isArray(seasons)) {
-                    seasons.forEach(season => {
-                        teamsArray.push({ name: teamName, season: season });
+            // Группируем команды по названию для отображения всех сезонов
+            const teamsMap = new Map();
+            
+            for (const item of teams) {
+                const teamName = item.team?.name || 'Неизвестно';
+                const teamId = item.team?.team_id;
+                const teamLogo = item.team?.url_logo || '';
+                const season = item.season || 'Текущий';
+                
+                if (!teamsMap.has(teamId)) {
+                    teamsMap.set(teamId, {
+                        id: teamId,
+                        name: teamName,
+                        logo: teamLogo,
+                        seasons: []
                     });
-                } else {
-                    teamsArray.push({ name: teamName, season: seasons || 'Текущий' });
                 }
+                teamsMap.get(teamId).seasons.push(season);
             }
             
-            list.innerHTML = teamsArray.map(team => `
-                <div class="card team-card" onclick="searchTeam('${encodeURIComponent(team.name)}')">
-                    <h3>${escapeHtml(team.name)}</h3>
-                    <p>${escapeHtml(team.season)}</p>
+            // Сортируем команды по названию
+            const sortedTeams = Array.from(teamsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+            
+            list.innerHTML = sortedTeams.map(team => `
+                <div class="card team-card" onclick="searchTeam('${encodeURIComponent(team.name)}')" style="display: flex; align-items: center; gap: 1rem; cursor: pointer;">
+                    ${team.logo ? `<img src="${team.logo}" alt="${escapeHtml(team.name)}" style="width: 50px; height: 50px; object-fit: contain; border-radius: 8px;">` : '<div style="width: 50px; height: 50px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center;">🏆</div>'}
+                    <div style="flex: 1;">
+                        <h3 style="margin-bottom: 0.25rem;">${escapeHtml(team.name)}</h3>
+                        <p style="font-size: 0.8rem; color: #666;">Сезоны: ${team.seasons.sort().reverse().join(', ')}</p>
+                    </div>
                 </div>
             `).join('');
         } else {
             document.getElementById('teams-list').innerHTML = '<p>История команд недоступна</p>';
         }
 
-        // Матчи
-        if (fixtures && Array.isArray(fixtures)) {
-            const list = document.getElementById('fixtures-list');
-            list.innerHTML = fixtures.slice(0, 20).map(f => {
-                const homeTeam = f.home_team?.name || 'Хозяева';
-                const awayTeam = f.away_team?.name || 'Гости';
-                const homeLogo = f.home_team?.url_logo || '';
-                const awayLogo = f.away_team?.url_logo || '';
-                const homeScore = f.home_team_score ?? '-';
-                const awayScore = f.away_team_score ?? '-';
-                const matchId = f.match_id;
-                const date = f.date ? new Date(f.date) : new Date();
-                const status = f.status || 'Scheduled';
-                const tournament = f.tournament?.name || '';
-                
-                let statusClass = '';
-                let statusText = '';
-                if (status === 'Ended') {
-                    statusClass = 'status-ended';
-                    statusText = '✓ Завершен';
-                } else if (status === 'Not started') {
-                    statusClass = 'status-scheduled';
-                    statusText = '⏱ Запланирован';
-                } else if (status === 'In Progress' || status === 'Live') {
-                    statusClass = 'status-live';
-                    statusText = '🟢 В прямом эфире';
-                }
-                
-                return `
-                    <div class="card match-card" onclick="goToMatch(${matchId})">
-                        <div class="match-header">
-                            <span>${date.toLocaleDateString('ru-RU')}</span>
-                            <span>${escapeHtml(tournament)}</span>
-                        </div>
-                        <div class="match-score">
-                            <div class="team-container">
-                                ${homeLogo ? `<img src="${homeLogo}" alt="${escapeHtml(homeTeam)}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
-                                <span class="team-name">${escapeHtml(homeTeam)}</span>
-                            </div>
-                            <span class="score">${homeScore} : ${awayScore}</span>
-                            <div class="team-container">
-                                <span class="team-name">${escapeHtml(awayTeam)}</span>
-                                ${awayLogo ? `<img src="${awayLogo}" alt="${escapeHtml(awayTeam)}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
-                            </div>
-                        </div>
-                        <div class="match-status ${statusClass}">
-                            ${statusText}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            document.getElementById('fixtures-list').innerHTML = '<p>Матчи недоступны</p>';
-        }
+        // Матчи с пагинацией и выбором сезона
+        addManagerFixturesSeasonSelector();
+        fixturesCurrentPage = 0;
+        currentFixturesSeason = null;
+        await loadManagerFixturesWithPagination(1, false, null);
         
         if (TokenManager.hasToken()) {
             try {
@@ -678,6 +653,231 @@ function switchManagerTab(tabName) {
     }
 }
 
+// Функция загрузки матчей тренера с пагинацией и сезоном
+async function loadManagerFixturesWithPagination(page = 1, append = false, season = null) {
+    if (!managerId || isLoadingFixtures) return;
+    
+    isLoadingFixtures = true;
+    const offset = (page - 1) * fixturesLimit + 1;
+    
+    try {
+        let url = `/api/manager/${managerId}/fixtures?limit=${fixturesLimit}&offset=${offset}`;
+        
+        if (season && season !== '') {
+            url += `&season=${encodeURIComponent(season)}`;
+        }
+        
+        console.log('Загрузка матчей тренера из:', url);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки матчей');
+        }
+        
+        const fixtures = await response.json();
+        console.log('Матчи тренера загружены:', fixtures);
+        
+        if (!fixtures || !Array.isArray(fixtures)) {
+            throw new Error('Некорректные данные матчей');
+        }
+        
+        if (fixtures.length < fixturesLimit) {
+            fixturesTotalCount = offset + fixtures.length;
+        } else {
+            fixturesTotalCount = offset + fixturesLimit + 1;
+        }
+        
+        renderManagerFixturesList(fixtures, append);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки матчей тренера:', error);
+        const list = document.getElementById('fixtures-list');
+        if (!append && list) {
+            list.innerHTML = '<p>Матчи недоступны</p>';
+        }
+    } finally {
+        isLoadingFixtures = false;
+    }
+}
+
+function renderManagerFixturesList(fixtures, append = false) {
+    const list = document.getElementById('fixtures-list');
+    if (!list) return;
+    
+    let html = '';
+    if (append && list.innerHTML !== '<p>Матчи недоступны</p>') {
+        html = list.innerHTML;
+        html = html.replace(/<div id="load-more-fixtures-container"[\s\S]*?<\/div>/, '');
+    }
+    
+    if (!fixtures || fixtures.length === 0) {
+        if (!append) {
+            list.innerHTML = '<p>Матчи недоступны</p>';
+        }
+        return;
+    }
+    
+    html += fixtures.map(f => {
+        const homeTeam = f.home_team?.name || 'Хозяева';
+        const awayTeam = f.away_team?.name || 'Гости';
+        const homeLogo = f.home_team?.url_logo || '';
+        const awayLogo = f.away_team?.url_logo || '';
+        const homeScore = f.home_team_score ?? '-';
+        const awayScore = f.away_team_score ?? '-';
+        const matchId = f.match_id;
+        const date = f.date ? new Date(f.date) : new Date();
+        const status = f.status || 'Scheduled';
+        const tournament = f.tournament?.name || '';
+        
+        let statusClass = '';
+        let statusText = '';
+        if (status === 'Ended') {
+            statusClass = 'status-ended';
+            statusText = '✓ Завершен';
+        } else if (status === 'Not started') {
+            statusClass = 'status-scheduled';
+            statusText = '⏱ Запланирован';
+        } else if (status === 'In Progress' || status === 'Live') {
+            statusClass = 'status-live';
+            statusText = '🟢 В прямом эфире';
+        }
+        
+        return `
+            <div class="card match-card" onclick="goToMatch(${matchId})">
+                <div class="match-header">
+                    <span>${date.toLocaleDateString('ru-RU')}</span>
+                    <span>${escapeHtml(tournament)}</span>
+                </div>
+                <div class="match-score">
+                    <div class="team-container">
+                        ${homeLogo ? `<img src="${homeLogo}" alt="${escapeHtml(homeTeam)}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
+                        <span class="team-name">${escapeHtml(homeTeam)}</span>
+                    </div>
+                    <span class="score">${homeScore} : ${awayScore}</span>
+                    <div class="team-container">
+                        <span class="team-name">${escapeHtml(awayTeam)}</span>
+                        ${awayLogo ? `<img src="${awayLogo}" alt="${escapeHtml(awayTeam)}" style="height: 30px; width: 30px; object-fit: contain;">` : ''}
+                    </div>
+                </div>
+                <div class="match-status ${statusClass}">
+                    ${statusText}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    const totalLoaded = (fixturesCurrentPage + 1) * fixturesLimit;
+    
+    if (totalLoaded < fixturesTotalCount) {
+        html += `
+            <div id="load-more-fixtures-container" style="text-align: center; margin-top: 1rem;">
+                <button id="load-more-fixtures" class="btn-secondary" onclick="loadMoreManagerFixtures()">Показать ещё ↓</button>
+            </div>
+        `;
+    } else {
+        const existingContainer = document.getElementById('load-more-fixtures-container');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
+    }
+    
+    list.innerHTML = html;
+}
+
+async function loadMoreManagerFixtures() {
+    if (isLoadingFixtures) return;
+    
+    fixturesCurrentPage++;
+    await loadManagerFixturesWithPagination(fixturesCurrentPage + 1, true, currentFixturesSeason);
+    
+    setTimeout(() => {
+        const loadMoreContainer = document.getElementById('load-more-fixtures-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, 100);
+}
+
+function addManagerFixturesSeasonSelector() {
+    const fixturesTab = document.getElementById('manager-fixtures');
+    if (!fixturesTab) return;
+    
+    if (document.getElementById('manager-fixtures-season-filter')) return;
+    
+    const seasonSelectorHtml = `
+        <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; gap: 0.5rem;">
+            <label>Сезон матчей:</label>
+            <select id="manager-fixtures-season-filter" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                <option value="">Текущий сезон</option>
+            </select>
+            <button id="apply-manager-fixtures-season" class="btn-primary" style="padding: 0.5rem 1rem;">Применить</button>
+        </div>
+    `;
+    
+    const fixturesList = document.getElementById('fixtures-list');
+    if (fixturesList) {
+        fixturesList.insertAdjacentHTML('beforebegin', seasonSelectorHtml);
+        
+        const seasons = generateSeasonsList();
+        const seasonSelect = document.getElementById('manager-fixtures-season-filter');
+        seasons.forEach(season => {
+            const option = document.createElement('option');
+            option.value = season;
+            option.textContent = season;
+            seasonSelect.appendChild(option);
+        });
+        
+        document.getElementById('apply-manager-fixtures-season').addEventListener('click', async () => {
+            currentFixturesSeason = document.getElementById('manager-fixtures-season-filter').value;
+            fixturesCurrentPage = 0;
+            
+            const existingContainer = document.getElementById('load-more-fixtures-container');
+            if (existingContainer) {
+                existingContainer.remove();
+            }
+            
+            await loadManagerFixturesWithPagination(1, false, currentFixturesSeason || null);
+            showFilterMessageForManager(`Матчи за сезон ${currentFixturesSeason || 'текущий'}`, 'success');
+        });
+    }
+}
+
+function showFilterMessageForManager(message, type = 'success') {
+    const existingMsg = document.querySelector('.manager-filter-message');
+    if (existingMsg) existingMsg.remove();
+    
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `manager-filter-message ${type}`;
+    msgDiv.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: ${type === 'success' ? '#2ecc71' : '#e74c3c'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    `;
+    msgDiv.textContent = message;
+    document.body.appendChild(msgDiv);
+    
+    setTimeout(() => {
+        msgDiv.style.opacity = '0';
+        msgDiv.style.transition = 'opacity 0.3s';
+        setTimeout(() => msgDiv.remove(), 300);
+    }, 3000);
+}
+
+function generateSeasonsList() {
+    const seasons = [];
+    for (let year = 2015; year <= 2025; year++) {
+        seasons.push(`${year}/${year + 1}`);
+    }
+    return seasons;
+}
+
 async function toggleFavorite() {
     if (!TokenManager.hasToken()) {
         toggleAuthPanel();
@@ -712,7 +912,7 @@ function searchTeam(teamName) {
     }
 }
 
-// Делаем функции сортировки глобальными
 window.sortTeamsData = sortTeamsData;
 window.sortSeasonsData = sortSeasonsData;
 window.updateStats = updateStats;
+window.loadMoreManagerFixtures = loadMoreManagerFixtures;
